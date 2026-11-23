@@ -95,6 +95,12 @@ class _PeersViewState extends State<_PeersView>
     LoadEvent.lan: 'empty_lan_tip',
     LoadEvent.addressBook: 'empty_address_book_tip',
   });
+  final HashMap<String, IconData> _emptyIcons = HashMap.from({
+    LoadEvent.recent: Icons.history_rounded,
+    LoadEvent.favorite: Icons.star_border_rounded,
+    LoadEvent.lan: Icons.lan_outlined,
+    LoadEvent.addressBook: Icons.contacts_outlined,
+  });
   final space = (isDesktop || isWebDesktop) ? 12.0 : 8.0;
   final _curPeers = <String>{};
   var _lastChangeTime = DateTime.now();
@@ -192,17 +198,22 @@ class _PeersViewState extends State<_PeersView>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  Icons.sentiment_very_dissatisfied_rounded,
-                  color: Theme.of(context).tabBarTheme.labelColor,
-                  size: 40,
-                ).paddingOnly(bottom: 10),
+                  _emptyIcons[widget.peers.loadEvent] ??
+                      Icons.inbox_outlined,
+                  color: Theme.of(context).hintColor.withOpacity(0.7),
+                  size: 44,
+                ).paddingOnly(bottom: 12),
                 Text(
                   translate(
                     _emptyMessages[widget.peers.loadEvent] ?? 'Empty',
                   ),
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Theme.of(context).tabBarTheme.labelColor,
+                    fontSize: 13,
+                    height: 1.4,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xFF98989D)
+                        : MyTheme.macSecondaryLabel,
                   ),
                 ),
               ],

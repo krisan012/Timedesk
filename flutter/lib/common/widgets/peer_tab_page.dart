@@ -145,18 +145,19 @@ class _PeerTabPageState extends State<PeerTabPage>
         physics: NeverScrollableScrollPhysics(),
         children: model.visibleEnabledOrderedIndexs.map((t) {
           final selected = model.currentTab == t;
+          final primary = Theme.of(context).colorScheme.primary;
           final color = selected
-              ? MyTheme.tabbar(context).selectedTextColor
-              : MyTheme.tabbar(context).unSelectedTextColor
-            ?..withOpacity(0.5);
+              ? primary
+              : MyTheme.tabbar(context).unSelectedTextColor;
           final hover = false.obs;
+          // macOS toolbar style: hover shows a soft grey pill, the selected
+          // tab a tinted accent pill.
           final deco = BoxDecoration(
-              color: Theme.of(context).colorScheme.background,
+              color: Theme.of(context).hoverColor,
               borderRadius: BorderRadius.circular(6));
           final decoBorder = BoxDecoration(
-              border: Border(
-            bottom: BorderSide(width: 2, color: color!),
-          ));
+              color: primary.withOpacity(0.13),
+              borderRadius: BorderRadius.circular(6));
           counter += 1;
           return ReorderableDragStartListener(
               key: ValueKey(t),
@@ -170,9 +171,10 @@ class _PeerTabPageState extends State<PeerTabPage>
                         decoration: (hover.value
                             ? (selected ? decoBorder : deco)
                             : (selected ? decoBorder : null)),
-                        child: Icon(model.tabIcon(t), color: color)
-                            .paddingSymmetric(horizontal: 4),
-                      ).paddingSymmetric(horizontal: 4),
+                        height: 28,
+                        child: Icon(model.tabIcon(t), color: color, size: 18)
+                            .paddingSymmetric(horizontal: 8),
+                      ).paddingSymmetric(horizontal: 2),
                       onTap: isOptionFixed(kOptionPeerTabIndex)
                           ? null
                           : () async {

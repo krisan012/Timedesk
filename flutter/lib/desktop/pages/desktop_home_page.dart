@@ -83,10 +83,15 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       Align(
         alignment: Alignment.center,
         child: loadLogo(),
-      ),
+      ).marginOnly(bottom: 6),
       buildTip(context),
-      if (!isOutgoingOnly) buildIDBoard(context),
-      if (!isOutgoingOnly) buildPasswordBoard(context),
+      if (!isOutgoingOnly)
+        _macGroup(context, [
+          buildIDBoard(context),
+          _macSeparator(context),
+          buildPasswordBoard(context),
+        ]),
+      if (!isOutgoingOnly) _buildTipText(context),
       FutureBuilder<Widget>(
         future: Future.value(
             Obx(() => buildHelpCards(stateGlobal.updateUrl.value))),
@@ -124,7 +129,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     return ChangeNotifierProvider.value(
       value: gFFI.serverModel,
       child: Container(
-        width: isIncomingOnly ? 280.0 : 200.0,
+        width: isIncomingOnly ? 280.0 : 236.0,
         color: Theme.of(context).colorScheme.background,
         child: Stack(
           children: [
@@ -180,65 +185,125 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     );
   }
 
+  // A rounded, hairline-bordered group box, like the grouped rows in the
+  // macOS sidebar and System Settings.
+  Widget _macGroup(BuildContext context, List<Widget> children) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: dark ? MyTheme.macGroupDark : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+            color: dark ? MyTheme.macSeparatorDark : const Color(0xFFE3E3E8),
+            width: 0.5),
+        boxShadow: dark
+            ? null
+            : [
+                BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 2,
+                    offset: const Offset(0, 1))
+              ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      ),
+    );
+  }
+
+  Widget _macSeparator(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      height: 0.5,
+      margin: const EdgeInsets.only(left: 12),
+      color: dark ? MyTheme.macSeparatorDark : MyTheme.macSeparatorLight,
+    );
+  }
+
+  TextStyle _macCaption(BuildContext context) => TextStyle(
+        fontSize: 11.5,
+        fontWeight: FontWeight.w500,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF98989D)
+            : MyTheme.macSecondaryLabel,
+      );
+
+  Widget _macIconButton(BuildContext context,
+      {required IconData icon,
+      required String tooltip,
+      required VoidCallback? onTap}) {
+    final hover = false.obs;
+    final base = Theme.of(context).brightness == Brightness.dark
+        ? const Color(0xFF98989D)
+        : MyTheme.macSecondaryLabel;
+    return Tooltip(
+      message: translate(tooltip),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(5),
+        onTap: onTap,
+        onHover: (v) => hover.value = v,
+        child: Obx(() => Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: hover.value
+                    ? base.withOpacity(0.15)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(5),
+              ),
+              child: Icon(icon,
+                  size: 15,
+                  color: hover.value
+                      ? Theme.of(context).textTheme.titleLarge?.color
+                      : base),
+            )),
+      ),
+    );
+  }
+
   buildIDBoard(BuildContext context) {
     final model = gFFI.serverModel;
-    return Container(
-      margin: const EdgeInsets.only(left: 20, right: 11),
-      height: 57,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 6, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    height: 25,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          translate("ID"),
-                          style: TextStyle(
-                              fontSize: 14,
-                              color: Theme.of(context)
-                                  .textTheme
-                                  .titleLarge
-                                  ?.color
-                                  ?.withOpacity(0.5)),
-                        ).marginOnly(top: 5),
-                        buildPopupMenu(context)
-                      ],
-                    ),
-                  ),
-                  Flexible(
-                    child: GestureDetector(
-                      onDoubleTap: () {
-                        Clipboard.setData(
-                            ClipboardData(text: model.serverId.text));
-                        showToast(translate("Copied"));
-                      },
-                      child: TextFormField(
-                        controller: model.serverId,
-                        readOnly: true,
-                        decoration: InputDecoration(
-                          border: InputBorder.none,
-                          filled: false,
-                          contentPadding: EdgeInsets.only(top: 10, bottom: 10),
-                        ),
-                        style: TextStyle(
-                          fontSize: 22,
-                        ),
-                      ).workaroundFreezeLinuxMint(),
-                    ),
-                  )
-                ],
+          Row(
+            children: [
+              Text(translate("ID"), style: _macCaption(context)),
+              const Spacer(),
+              _macIconButton(context,
+                  icon: Icons.copy_rounded,
+                  tooltip: 'Copy',
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: model.serverId.text));
+                    showToast(translate("Copied"));
+                  }),
+              buildPopupMenu(context),
+            ],
+          ),
+          GestureDetector(
+            onDoubleTap: () {
+              Clipboard.setData(ClipboardData(text: model.serverId.text));
+              showToast(translate("Copied"));
+            },
+            child: TextFormField(
+              controller: model.serverId,
+              readOnly: true,
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                filled: false,
+                isDense: true,
+                contentPadding: EdgeInsets.only(top: 2, bottom: 2),
               ),
-            ),
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+              ),
+            ).workaroundFreezeLinuxMint(),
           ),
         ],
       ),
@@ -246,28 +311,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget buildPopupMenu(BuildContext context) {
-    final textColor = Theme.of(context).textTheme.titleLarge?.color;
-    RxBool hover = false.obs;
-    return InkWell(
-      onTap: DesktopTabPage.onAddSetting,
-      child: Tooltip(
-        message: translate('Settings'),
-        child: Obx(
-          () => CircleAvatar(
-            radius: 15,
-            backgroundColor: hover.value
-                ? Theme.of(context).scaffoldBackgroundColor
-                : Theme.of(context).colorScheme.background,
-            child: Icon(
-              Icons.more_vert_outlined,
-              size: 20,
-              color: hover.value ? textColor : textColor?.withOpacity(0.5),
-            ),
-          ),
-        ),
-      ),
-      onHover: (value) => hover.value = value,
-    );
+    return _macIconButton(context,
+        icon: Icons.more_horiz,
+        tooltip: 'Settings',
+        onTap: DesktopTabPage.onAddSetting);
   }
 
   buildPasswordBoard(BuildContext context) {
@@ -281,93 +328,65 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   buildPasswordBoard2(BuildContext context, ServerModel model) {
-    RxBool refreshHover = false.obs;
-    RxBool editHover = false.obs;
-    final textColor = Theme.of(context).textTheme.titleLarge?.color;
     final showOneTime = model.approveMode != 'click' &&
         model.verificationMethod != kUsePermanentPassword;
-    return Container(
-      margin: EdgeInsets.only(left: 20.0, right: 16, top: 13, bottom: 13),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 6, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AutoSizeText(
-                    translate("One-time Password"),
-                    style: TextStyle(
-                        fontSize: 14, color: textColor?.withOpacity(0.5)),
-                    maxLines: 1,
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onDoubleTap: () {
-                            if (showOneTime) {
-                              Clipboard.setData(
-                                  ClipboardData(text: model.serverPasswd.text));
-                              showToast(translate("Copied"));
-                            }
-                          },
-                          child: TextFormField(
-                            controller: model.serverPasswd,
-                            readOnly: true,
-                            decoration: InputDecoration(
-                              border: InputBorder.none,
-                              filled: false,
-                              contentPadding:
-                                  EdgeInsets.only(top: 14, bottom: 10),
-                            ),
-                            style: TextStyle(fontSize: 15),
-                          ).workaroundFreezeLinuxMint(),
-                        ),
-                      ),
-                      if (showOneTime)
-                        AnimatedRotationWidget(
-                          onPressed: () => bind.mainUpdateTemporaryPassword(),
-                          child: Tooltip(
-                            message: translate('Refresh Password'),
-                            child: Obx(() => RotatedBox(
-                                quarterTurns: 2,
-                                child: Icon(
-                                  Icons.refresh,
-                                  color: refreshHover.value
-                                      ? textColor
-                                      : Color(0xFFDDDDDD),
-                                  size: 22,
-                                ))),
-                          ),
-                          onHover: (value) => refreshHover.value = value,
-                        ).marginOnly(right: 8, top: 4),
-                      if (!bind.isDisableSettings())
-                        InkWell(
-                          child: Tooltip(
-                            message: translate('Change Password'),
-                            child: Obx(
-                              () => Icon(
-                                Icons.edit,
-                                color: editHover.value
-                                    ? textColor
-                                    : Color(0xFFDDDDDD),
-                                size: 22,
-                              ).marginOnly(right: 8, top: 4),
-                            ),
-                          ),
-                          onTap: () => DesktopSettingPage.switch2page(
-                              SettingsTabKey.safety),
-                          onHover: (value) => editHover.value = value,
-                        ),
-                    ],
-                  ),
-                ],
+          Row(
+            children: [
+              Expanded(
+                child: AutoSizeText(
+                  translate("One-time Password"),
+                  style: _macCaption(context),
+                  maxLines: 1,
+                ),
               ),
-            ),
+              if (showOneTime)
+                _macIconButton(context,
+                    icon: Icons.copy_rounded,
+                    tooltip: 'Copy',
+                    onTap: () {
+                      Clipboard.setData(
+                          ClipboardData(text: model.serverPasswd.text));
+                      showToast(translate("Copied"));
+                    }),
+              if (showOneTime)
+                _macIconButton(context,
+                    icon: Icons.refresh_rounded,
+                    tooltip: 'Refresh Password',
+                    onTap: () => bind.mainUpdateTemporaryPassword()),
+              if (!bind.isDisableSettings())
+                _macIconButton(context,
+                    icon: Icons.edit_outlined,
+                    tooltip: 'Change Password',
+                    onTap: () =>
+                        DesktopSettingPage.switch2page(SettingsTabKey.safety)),
+            ],
+          ),
+          GestureDetector(
+            onDoubleTap: () {
+              if (showOneTime) {
+                Clipboard.setData(ClipboardData(text: model.serverPasswd.text));
+                showToast(translate("Copied"));
+              }
+            },
+            child: TextFormField(
+              controller: model.serverPasswd,
+              readOnly: true,
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                filled: false,
+                isDense: true,
+                contentPadding: EdgeInsets.only(top: 4, bottom: 2),
+              ),
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 1.2),
+            ).workaroundFreezeLinuxMint(),
           ),
         ],
       ),
@@ -376,41 +395,30 @@ class _DesktopHomePageState extends State<DesktopHomePage>
 
   buildTip(BuildContext context) {
     final isOutgoingOnly = bind.isOutgoingOnly();
+    if (isOutgoingOnly) {
+      return _buildTipText(context);
+    }
     return Padding(
-      padding:
-          const EdgeInsets.only(left: 20.0, right: 16, top: 16.0, bottom: 5),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Column(
-            children: [
-              if (!isOutgoingOnly)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    translate("Your Desktop"),
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
-            ],
-          ),
-          SizedBox(
-            height: 10.0,
-          ),
-          if (!isOutgoingOnly)
-            Text(
-              translate("desk_tip"),
-              overflow: TextOverflow.clip,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          if (isOutgoingOnly)
-            Text(
-              translate("outgoing_only_desk_tip"),
-              overflow: TextOverflow.clip,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-        ],
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          translate("Your Desktop"),
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTipText(BuildContext context) {
+    final isOutgoingOnly = bind.isOutgoingOnly();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 8, 16, 6),
+      child: Text(
+        translate(isOutgoingOnly ? "outgoing_only_desk_tip" : "desk_tip"),
+        overflow: TextOverflow.clip,
+        style: _macCaption(context).copyWith(
+            fontWeight: FontWeight.w400, fontSize: 11.5, height: 1.35),
       ),
     );
   }
