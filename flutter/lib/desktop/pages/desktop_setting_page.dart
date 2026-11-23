@@ -2633,6 +2633,7 @@ class _AboutState extends State<_About> {
                   ).marginSymmetric(vertical: 4.0)),
               const SizedBox(height: 12.0),
               Container(
+                width: double.infinity,
                 decoration: BoxDecoration(
                   color: Theme.of(context).brightness == Brightness.dark
                       ? const Color(0xFF212529)
@@ -2663,17 +2664,6 @@ class _AboutState extends State<_About> {
                       'Copyright © ${DateTime.now().toString().substring(0, 4)} Timelapse. All rights reserved.',
                     ),
                     if (license.isNotEmpty) Text(license),
-                    const SizedBox(height: 6.0),
-                    Text(
-                      'TimeDesk is based on the open-source RustDesk project (AGPL-3.0).',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.color
-                              ?.withOpacity(0.6)),
-                    ),
                   ],
                 )),
               ).marginSymmetric(vertical: 4.0)
