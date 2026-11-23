@@ -2631,29 +2631,48 @@ class _AboutState extends State<_About> {
                     translate('Website'),
                     style: linkStyle,
                   ).marginSymmetric(vertical: 4.0)),
+              const SizedBox(height: 12.0),
               Container(
-                decoration: const BoxDecoration(color: Color(0xFF2c8cff)),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF212529)
+                      : Colors.white,
+                  border: const Border(
+                      left: BorderSide(color: Color(0xFFC12126), width: 4)),
+                ),
                 padding:
-                    const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
+                    const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
                 child: SelectionArea(
-                    child: Row(
+                    child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Copyright © ${DateTime.now().toString().substring(0, 4)} Purslane Tech Pte. Ltd.\n$license',
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                          Text(
-                            translate('Slogan_tip'),
-                            style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white),
-                          )
-                        ],
+                    Image.asset(
+                      Theme.of(context).brightness == Brightness.dark
+                          ? 'assets/logo_dark.png'
+                          : 'assets/logo_light.png',
+                      height: 56,
+                      fit: BoxFit.contain,
+                      errorBuilder: (ctx, error, stackTrace) => const Text(
+                        'TIMELAPSE',
+                        style: TextStyle(
+                            fontSize: 28, fontWeight: FontWeight.w800),
                       ),
+                    ),
+                    const SizedBox(height: 16.0),
+                    Text(
+                      'Copyright © ${DateTime.now().toString().substring(0, 4)} Timelapse. All rights reserved.',
+                    ),
+                    if (license.isNotEmpty) Text(license),
+                    const SizedBox(height: 6.0),
+                    Text(
+                      'TimeDesk is based on the open-source RustDesk project (AGPL-3.0).',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.color
+                              ?.withOpacity(0.6)),
                     ),
                   ],
                 )),
