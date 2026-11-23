@@ -205,7 +205,7 @@ def generate_build_script_for_docker():
             vcpkg/bootstrap-vcpkg.sh
             popd
             $VCPKG_ROOT/vcpkg install --x-install-root="$VCPKG_ROOT/installed"
-            # build rustdesk
+            # build timedesk
             ./build.py --flutter --hwcodec
         ''')
     system2("chmod +x /tmp/build.sh")
@@ -341,12 +341,12 @@ def generate_control_file(version):
     control_file_path = "../res/DEBIAN/control"
     system2('/bin/rm -rf %s' % control_file_path)
 
-    content = """Package: rustdesk
+    content = """Package: timedesk
 Section: net
 Priority: optional
 Version: %s
 Architecture: %s
-Maintainer: rustdesk <info@rustdesk.com>
+Maintainer: timedesk <info@rustdesk.com>
 Homepage: https://rustdesk.com
 Depends: libgtk-3-0t64 | libgtk-3-0, libxcb-randr0, libxdo3 | libxdo4, libxfixes3, libxcb-shape0, libxcb-xfixes0, libasound2t64 | libasound2, libsystemd0, curl, libva2, libva-drm2, libva-x11-2, libgstreamer-plugins-base1.0-0, gstreamer1.0-pipewire%s
 Recommends: libayatana-appindicator3-1, libdrm2 (>= 2.4.101), libegl1, libgles2
@@ -367,9 +367,9 @@ def ffi_bindgen_function_refactor():
 
 
 # libdrmtap is fetched at build time from the rustdesk-org fork at a pinned
-# commit — the same way rustdesk sources its other native build deps (vcpkg,
+# commit — the same way timedesk sources its other native build deps (vcpkg,
 # flutter_rust_bridge, ...), rather than carrying a git submodule. It is the ONLY
-# pin for the drm backend: rustdesk dlopens this .so at runtime and does not depend on
+# pin for the drm backend: timedesk dlopens this .so at runtime and does not depend on
 # the libdrmtap-sys crate (whose build.rs would statically link the C tree, a helper and
 # libdrm/seccomp/cap). DRMTAP_REPO, DRMTAP_SHA and DRMTAP_PREBUILT_DIR override it for local testing
 # or another fork, and each requires DRMTAP_ALLOW_UNPINNED=1 alongside it (see below).
@@ -515,7 +515,7 @@ def build_libdrmtap_so():
     # the build rather than shipping it, so this is a developer-build correctness fix and not a
     # security one -- but it turns a confusing failure into no failure at all.
     if not os.path.exists(os.path.join(build_dir, 'build.ninja')):
-        # -Dhelper=disabled: rustdesk never uses the privileged helper. The capture context is
+        # -Dhelper=disabled: timedesk never uses the privileged helper. The capture context is
         # opened only in the root service (every drmtap_open lives in src/ipc/drm.rs), which
         # already has CAP_SYS_ADMIN, and the unprivileged side opens a render node instead. Without
         # this the library still carries the fallback: a fork/exec that walks six hardcoded paths,
@@ -528,7 +528,7 @@ def build_libdrmtap_so():
     # Build only the shared library, not the bundled helper binary or the static archive. Since
     # libdrmtap 0.4.11 the project is `both_libraries` (a version-scripted .so + a static .a), so the
     # bare `drmtap` target is ambiguous ("drmtap:shared_library" vs "drmtap:static_library"); ask for
-    # the shared one explicitly (rustdesk dlopens the .so and never needs the archive).
+    # the shared one explicitly (timedesk dlopens the .so and never needs the archive).
     system2(f'meson compile -C "{build_dir}" drmtap:shared_library')
     sos = glob.glob(os.path.join(build_dir, 'libdrmtap.so.0.*'))
     # keep the real object (libdrmtap.so.0.4.x), not the .so/.so.0 symlinks or meson's .p dir, and
@@ -555,7 +555,7 @@ def _assert_so_has_no_helper(so_path):
     if found:
         raise Exception(
             f'{so_path} still carries the privileged-helper fallback ({", ".join(found)}). '
-            f'It must be built with -Dhelper=disabled: rustdesk captures as root and never uses '
+            f'It must be built with -Dhelper=disabled: timedesk captures as root and never uses '
             f'the helper, so this is a fork/exec path in the privileged process that nothing '
             f'reaches. Delete third_party/libdrmtap/build-pkg and rebuild.')
 
@@ -641,18 +641,18 @@ def assert_so_satisfies_the_runtime_abi_gate(so_path):
 
 def stage_libdrmtap_into_deb(so_path):
     # Put the built libdrmtap object plus its soname symlink into the staged deb. Only the soname
-    # symlink is needed: libdrmtap is resolved by ABSOLUTE path (/usr/lib/rustdesk/libdrmtap.so.0) at
-    # the in-process dlopen site (drmtap_dl.rs), so the deb does NOT drop /usr/lib/rustdesk into the
+    # symlink is needed: libdrmtap is resolved by ABSOLUTE path (/usr/lib/timedesk/libdrmtap.so.0) at
+    # the in-process dlopen site (drmtap_dl.rs), so the deb does NOT drop /usr/lib/timedesk into the
     # system-wide /etc/ld.so.conf.d search path, which would let this private library shadow a system
     # library for every binary on the host (Debian Policy 10.2 forbids that). No ld.so.conf.d drop-in
     # and no ldconfig trigger are shipped, so the stock postinst is used unchanged.
     assert_so_satisfies_the_runtime_abi_gate(so_path)
     so_basename = os.path.basename(so_path)
-    system2('mkdir -p tmpdeb/usr/lib/rustdesk')
+    system2('mkdir -p tmpdeb/usr/lib/timedesk')
     # Quoted: so_path comes from the repo root or from DRMTAP_PREBUILT_DIR, either of which can
     # contain a space, and an unquoted interpolation would split the argument and fail obscurely.
-    system2(f'cp "{so_path}" tmpdeb/usr/lib/rustdesk/')
-    system2(f'ln -sf "{so_basename}" tmpdeb/usr/lib/rustdesk/libdrmtap.so.0')
+    system2(f'cp "{so_path}" tmpdeb/usr/lib/timedesk/')
+    system2(f'ln -sf "{so_basename}" tmpdeb/usr/lib/timedesk/libdrmtap.so.0')
 
 
 def build_flutter_deb(version, features):
@@ -662,27 +662,27 @@ def build_flutter_deb(version, features):
     os.chdir('flutter')
     system2('flutter build linux --release')
     system2('mkdir -p tmpdeb/usr/bin/')
-    system2('mkdir -p tmpdeb/usr/share/rustdesk')
-    system2('mkdir -p tmpdeb/usr/share/rustdesk/files/systemd/')
+    system2('mkdir -p tmpdeb/usr/share/timedesk')
+    system2('mkdir -p tmpdeb/usr/share/timedesk/files/systemd/')
     system2('mkdir -p tmpdeb/usr/share/icons/hicolor/256x256/apps/')
     system2('mkdir -p tmpdeb/usr/share/icons/hicolor/scalable/apps/')
     system2('mkdir -p tmpdeb/usr/share/applications/')
     system2('mkdir -p tmpdeb/usr/share/polkit-1/actions')
-    system2('rm tmpdeb/usr/bin/rustdesk || true')
+    system2('rm tmpdeb/usr/bin/timedesk || true')
     system2(
-        f'cp -r {flutter_build_dir}/* tmpdeb/usr/share/rustdesk/')
+        f'cp -r {flutter_build_dir}/* tmpdeb/usr/share/timedesk/')
     system2(
-        'cp ../res/rustdesk.service tmpdeb/usr/share/rustdesk/files/systemd/')
+        'cp ../res/timedesk.service tmpdeb/usr/share/timedesk/files/systemd/')
     system2(
-        'cp ../res/128x128@2x.png tmpdeb/usr/share/icons/hicolor/256x256/apps/rustdesk.png')
+        'cp ../res/128x128@2x.png tmpdeb/usr/share/icons/hicolor/256x256/apps/timedesk.png')
     system2(
-        'cp ../res/scalable.svg tmpdeb/usr/share/icons/hicolor/scalable/apps/rustdesk.svg')
+        'cp ../res/scalable.svg tmpdeb/usr/share/icons/hicolor/scalable/apps/timedesk.svg')
     system2(
-        'cp ../res/rustdesk.desktop tmpdeb/usr/share/applications/rustdesk.desktop')
+        'cp ../res/timedesk.desktop tmpdeb/usr/share/applications/timedesk.desktop')
     system2(
-        'cp ../res/rustdesk-link.desktop tmpdeb/usr/share/applications/rustdesk-link.desktop')
+        'cp ../res/timedesk-link.desktop tmpdeb/usr/share/applications/timedesk-link.desktop')
     system2(
-        "echo \"#!/bin/sh\" >> tmpdeb/usr/share/rustdesk/files/polkit && chmod a+x tmpdeb/usr/share/rustdesk/files/polkit")
+        "echo \"#!/bin/sh\" >> tmpdeb/usr/share/timedesk/files/polkit && chmod a+x tmpdeb/usr/share/timedesk/files/polkit")
     # Bundle libdrmtap.so only when this build actually enabled the `drm` feature (not with
     # --no-drm). The root service dlopens it in-process by absolute path.
     # `features` is the comma-joined string, so split it: a bare substring test would also match any
@@ -698,15 +698,15 @@ def build_flutter_deb(version, features):
     generate_control_file(version)
     system2('cp -a ../res/DEBIAN/* tmpdeb/DEBIAN/')
     md5_file_folder("tmpdeb/")
-    system2('dpkg-deb -b tmpdeb rustdesk.deb;')
+    system2('dpkg-deb -b tmpdeb timedesk.deb;')
 
     system2('/bin/rm -rf tmpdeb/')
     system2('/bin/rm -rf ../res/DEBIAN/control')
-    os.rename('rustdesk.deb', '../rustdesk-%s.deb' % version)
+    os.rename('timedesk.deb', '../timedesk-%s.deb' % version)
     os.chdir("..")
 
 
-DRMTAP_DLOPEN_MARKER = b'/usr/lib/rustdesk/libdrmtap.so.0'
+DRMTAP_DLOPEN_MARKER = b'/usr/lib/timedesk/libdrmtap.so.0'
 # Present only when `drm-wake` is compiled in: the runtime option constant is itself
 # #[cfg(feature = "drm-wake")] (src/ipc/drm.rs). The dlopen marker above cannot stand in for it -
 # `--features drm` alone produces a binary that carries the dlopen path and NO wake code, and that
@@ -736,8 +736,8 @@ def assert_staged_binary_is_drm():
     drmtap_dl.rs, present only when the feature is compiled in -- assert what was produced, not
     what was asked for.
     """
-    binaries = [p for p in glob.glob('tmpdeb/usr/share/rustdesk/lib/librustdesk.so')
-                + glob.glob('tmpdeb/usr/share/rustdesk/rustdesk') if os.path.isfile(p)]
+    binaries = [p for p in glob.glob('tmpdeb/usr/share/timedesk/lib/librustdesk.so')
+                + glob.glob('tmpdeb/usr/share/timedesk/timedesk') if os.path.isfile(p)]
     if not any(_carries_drmtap_marker(p) for p in binaries):
         raise Exception(
             f'the build enabled drm but the staged bundle does not look like a drm build (no '
@@ -756,39 +756,39 @@ def assert_staged_binary_is_drm():
 def build_deb_from_folder(version, binary_folder):
     os.chdir('flutter')
     system2('mkdir -p tmpdeb/usr/bin/')
-    system2('mkdir -p tmpdeb/usr/share/rustdesk')
-    system2('mkdir -p tmpdeb/usr/share/rustdesk/files/systemd/')
+    system2('mkdir -p tmpdeb/usr/share/timedesk')
+    system2('mkdir -p tmpdeb/usr/share/timedesk/files/systemd/')
     system2('mkdir -p tmpdeb/usr/share/icons/hicolor/256x256/apps/')
     system2('mkdir -p tmpdeb/usr/share/icons/hicolor/scalable/apps/')
     system2('mkdir -p tmpdeb/usr/share/applications/')
     system2('mkdir -p tmpdeb/usr/share/polkit-1/actions')
-    system2('rm tmpdeb/usr/bin/rustdesk || true')
+    system2('rm tmpdeb/usr/bin/timedesk || true')
     system2(
-        f'cp -r ../{binary_folder}/* tmpdeb/usr/share/rustdesk/')
+        f'cp -r ../{binary_folder}/* tmpdeb/usr/share/timedesk/')
     system2(
-        'cp ../res/rustdesk.service tmpdeb/usr/share/rustdesk/files/systemd/')
+        'cp ../res/timedesk.service tmpdeb/usr/share/timedesk/files/systemd/')
     system2(
-        'cp ../res/128x128@2x.png tmpdeb/usr/share/icons/hicolor/256x256/apps/rustdesk.png')
+        'cp ../res/128x128@2x.png tmpdeb/usr/share/icons/hicolor/256x256/apps/timedesk.png')
     system2(
-        'cp ../res/scalable.svg tmpdeb/usr/share/icons/hicolor/scalable/apps/rustdesk.svg')
+        'cp ../res/scalable.svg tmpdeb/usr/share/icons/hicolor/scalable/apps/timedesk.svg')
     system2(
-        'cp ../res/rustdesk.desktop tmpdeb/usr/share/applications/rustdesk.desktop')
+        'cp ../res/timedesk.desktop tmpdeb/usr/share/applications/timedesk.desktop')
     system2(
-        'cp ../res/rustdesk-link.desktop tmpdeb/usr/share/applications/rustdesk-link.desktop')
+        'cp ../res/timedesk-link.desktop tmpdeb/usr/share/applications/timedesk-link.desktop')
     system2(
-        "echo \"#!/bin/sh\" >> tmpdeb/usr/share/rustdesk/files/polkit && chmod a+x tmpdeb/usr/share/rustdesk/files/polkit")
+        "echo \"#!/bin/sh\" >> tmpdeb/usr/share/timedesk/files/polkit && chmod a+x tmpdeb/usr/share/timedesk/files/polkit")
     # Where the capture library comes from for a `--package <folder>` drm build. Two shapes are
     # supported, because two exist in practice: a bundle that already carries libdrmtap.so.0.*
     # (someone staged it, e.g. a CI artifact), and a plain bundle, which is what every build path
     # here actually produces -- the flutter deb builds the library straight into the staged deb, so
     # nothing ever puts it inside the bundle folder.
-    bundled_glob = glob.glob('tmpdeb/usr/share/rustdesk/libdrmtap.so.0.*')
+    bundled_glob = glob.glob('tmpdeb/usr/share/timedesk/libdrmtap.so.0.*')
     bundle_carries_so = any(os.path.isfile(p) and not os.path.islink(p) for p in bundled_glob)
     # `--package` compiles nothing, so only the staged binary knows whether it is a drm build; a
     # Sciter or --no-drm bundle must not get libdrmtap.
     want_drm = any(_carries_drmtap_marker(p)
-                   for p in glob.glob('tmpdeb/usr/share/rustdesk/lib/librustdesk.so')
-                   + glob.glob('tmpdeb/usr/share/rustdesk/rustdesk') if os.path.isfile(p))
+                   for p in glob.glob('tmpdeb/usr/share/timedesk/lib/librustdesk.so')
+                   + glob.glob('tmpdeb/usr/share/timedesk/timedesk') if os.path.isfile(p))
     if bundle_carries_so and not want_drm:
         raise Exception(
             'the staged bundle carries libdrmtap.so.0.* but the binary is not a drm build')
@@ -807,7 +807,7 @@ def build_deb_from_folder(version, binary_folder):
             _assert_so_has_no_helper(so)
             stage_libdrmtap_into_deb(so)
             system2(f'rm -f "{so}"')
-            system2('rm -f tmpdeb/usr/share/rustdesk/libdrmtap.so tmpdeb/usr/share/rustdesk/libdrmtap.so.0')
+            system2('rm -f tmpdeb/usr/share/timedesk/libdrmtap.so tmpdeb/usr/share/timedesk/libdrmtap.so.0')
         else:
             # Build it here, exactly as the flutter deb path does (build_libdrmtap_so asserts the
             # EGL backend itself). The library is independent of the staged binary.
@@ -817,11 +817,11 @@ def build_deb_from_folder(version, binary_folder):
     generate_control_file(version)
     system2('cp -a ../res/DEBIAN/* tmpdeb/DEBIAN/')
     md5_file_folder("tmpdeb/")
-    system2('dpkg-deb -b tmpdeb rustdesk.deb;')
+    system2('dpkg-deb -b tmpdeb timedesk.deb;')
 
     system2('/bin/rm -rf tmpdeb/')
     system2('/bin/rm -rf ../res/DEBIAN/control')
-    os.rename('rustdesk.deb', '../rustdesk-%s.deb' % version)
+    os.rename('timedesk.deb', '../timedesk-%s.deb' % version)
     os.chdir("..")
 
 
@@ -840,11 +840,11 @@ def build_flutter_dmg(version, features):
     mac_arch = 'arm64' if platform.machine().lower() in ('arm64', 'aarch64') else 'x86_64'
     system2(
         f'FLUTTER_XCODE_ARCHS={mac_arch} FLUTTER_XCODE_ONLY_ACTIVE_ARCH=YES flutter build macos --release')
-    system2('cp -rf ../target/release/service ./build/macos/Build/Products/Release/RustDesk.app/Contents/MacOS/')
+    system2('cp -rf ../target/release/service ./build/macos/Build/Products/Release/TimeDesk.app/Contents/MacOS/')
     '''
     system2(
-        "create-dmg --volname \"RustDesk Installer\" --window-pos 200 120 --window-size 800 400 --icon-size 100 --app-drop-link 600 185 --icon RustDesk.app 200 190 --hide-extension RustDesk.app rustdesk.dmg ./build/macos/Build/Products/Release/RustDesk.app")
-    os.rename("rustdesk.dmg", f"../rustdesk-{version}.dmg")
+        "create-dmg --volname \"TimeDesk Installer\" --window-pos 200 120 --window-size 800 400 --icon-size 100 --app-drop-link 600 185 --icon TimeDesk.app 200 190 --hide-extension TimeDesk.app timedesk.dmg ./build/macos/Build/Products/Release/TimeDesk.app")
+    os.rename("timedesk.dmg", f"../timedesk-{version}.dmg")
     '''
     os.chdir("..")
 
@@ -879,7 +879,7 @@ def build_flutter_windows(version, features, skip_portable_pack):
     os.chdir('libs/portable')
     system2('pip3 install -r requirements.txt')
     system2(
-        f'python3 ./generate.py -f ../../{flutter_build_dir_2} -o . -e ../../{flutter_build_dir_2}/rustdesk.exe')
+        f'python3 ./generate.py -f ../../{flutter_build_dir_2} -o . -e ../../{flutter_build_dir_2}/timedesk.exe')
     os.chdir('../..')
     if os.path.exists('./rustdesk_portable.exe'):
         os.replace('./target/release/rustdesk-portable-packer.exe',
@@ -889,9 +889,9 @@ def build_flutter_windows(version, features, skip_portable_pack):
                   './rustdesk_portable.exe')
     print(
         f'output location: {os.path.abspath(os.curdir)}/rustdesk_portable.exe')
-    os.rename('./rustdesk_portable.exe', f'./rustdesk-{version}-install.exe')
+    os.rename('./rustdesk_portable.exe', f'./timedesk-{version}-install.exe')
     print(
-        f'output location: {os.path.abspath(os.curdir)}/rustdesk-{version}-install.exe')
+        f'output location: {os.path.abspath(os.curdir)}/timedesk-{version}-install.exe')
 
 
 def main():
@@ -942,7 +942,7 @@ def main():
             return
         system2('cargo build --locked --release --features ' + features)
         # system2('upx.exe target/release/rustdesk.exe')
-        system2('mv target/release/rustdesk.exe target/release/RustDesk.exe')
+        system2('mv target/release/rustdesk.exe target/release/TimeDesk.exe')
         pa = os.environ.get('P')
         if pa:
             # https://certera.com/kb/tutorial-guide-for-safenet-authentication-client-for-code-signing/
@@ -953,12 +953,12 @@ def main():
             print('Not signed')
         os.makedirs(res_dir, exist_ok=True)
         system2(
-            f'cp -rf target/release/RustDesk.exe {res_dir}')
+            f'cp -rf target/release/TimeDesk.exe {res_dir}')
         os.chdir('libs/portable')
         system2('pip3 install -r requirements.txt')
         system2(
-            f'python3 ./generate.py -f ../../{res_dir} -o . -e ../../{res_dir}/rustdesk-{version}-win7-install.exe')
-        system2(f'mv ../../{res_dir}/rustdesk-{version}-win7-install.exe ../..')
+            f'python3 ./generate.py -f ../../{res_dir} -o . -e ../../{res_dir}/timedesk-{version}-win7-install.exe')
+        system2(f'mv ../../{res_dir}/timedesk-{version}-win7-install.exe ../..')
     elif os.path.isfile('/usr/bin/pacman'):
         # pacman -S -needed base-devel
         system2("sed -i 's/pkgver=.*/pkgver=%s/g' res/PKGBUILD" % version)
@@ -970,9 +970,9 @@ def main():
             system2('strip target/release/rustdesk')
             system2('ln -s res/pacman_install && ln -s res/PKGBUILD')
             system2('HBB=`pwd` makepkg -f')
-        system2('mv rustdesk-%s-0-x86_64.pkg.tar.zst rustdesk-%s-manjaro-arch.pkg.tar.zst' % (
+        system2('mv timedesk-%s-0-x86_64.pkg.tar.zst timedesk-%s-manjaro-arch.pkg.tar.zst' % (
             version, version))
-        # pacman -U ./rustdesk.pkg.tar.zst
+        # pacman -U ./timedesk.pkg.tar.zst
     elif os.path.isfile('/usr/bin/yum'):
         system2('cargo build --locked --release --features ' + features)
         system2('strip target/release/rustdesk')
@@ -980,9 +980,9 @@ def main():
             "sed -i 's/Version:    .*/Version:    %s/g' res/rpm.spec" % version)
         system2('HBB=`pwd` rpmbuild -ba res/rpm.spec')
         system2(
-            'mv $HOME/rpmbuild/RPMS/x86_64/rustdesk-%s-0.x86_64.rpm ./rustdesk-%s-fedora28-centos8.rpm' % (
+            'mv $HOME/rpmbuild/RPMS/x86_64/timedesk-%s-0.x86_64.rpm ./timedesk-%s-fedora28-centos8.rpm' % (
                 version, version))
-        # yum localinstall rustdesk.rpm
+        # yum localinstall timedesk.rpm
     elif os.path.isfile('/usr/bin/zypper'):
         system2('cargo build --locked --release --features ' + features)
         system2('strip target/release/rustdesk')
@@ -990,9 +990,9 @@ def main():
             "sed -i 's/Version:    .*/Version:    %s/g' res/rpm-suse.spec" % version)
         system2('HBB=`pwd` rpmbuild -ba res/rpm-suse.spec')
         system2(
-            'mv $HOME/rpmbuild/RPMS/x86_64/rustdesk-%s-0.x86_64.rpm ./rustdesk-%s-suse.rpm' % (
+            'mv $HOME/rpmbuild/RPMS/x86_64/timedesk-%s-0.x86_64.rpm ./timedesk-%s-suse.rpm' % (
                 version, version))
-        # yum localinstall rustdesk.rpm
+        # yum localinstall timedesk.rpm
     else:
         if flutter:
             if osx:
@@ -1000,15 +1000,15 @@ def main():
                 pass
             else:
                 # system2(
-                #     'mv target/release/bundle/deb/rustdesk*.deb ./flutter/rustdesk.deb')
+                #     'mv target/release/bundle/deb/timedesk*.deb ./flutter/timedesk.deb')
                 build_flutter_deb(version, features)
         else:
             system2('cargo --locked bundle --release --features ' + features)
             if osx:
                 system2(
-                    'strip target/release/bundle/osx/RustDesk.app/Contents/MacOS/rustdesk')
+                    'strip target/release/bundle/osx/TimeDesk.app/Contents/MacOS/rustdesk')
                 system2(
-                    'cp libsciter.dylib target/release/bundle/osx/RustDesk.app/Contents/MacOS/')
+                    'cp libsciter.dylib target/release/bundle/osx/TimeDesk.app/Contents/MacOS/')
                 # https://github.com/sindresorhus/create-dmg
                 system2('/bin/rm -rf *.dmg')
                 pa = os.environ.get('P')
@@ -1016,59 +1016,59 @@ def main():
                     system2('''
     # buggy: rcodesign sign ... path/*, have to sign one by one
     # install rcodesign via cargo install apple-codesign
-    #rcodesign sign --p12-file ~/.p12/rustdesk-developer-id.p12 --p12-password-file ~/.p12/.cert-pass --code-signature-flags runtime ./target/release/bundle/osx/RustDesk.app/Contents/MacOS/rustdesk
-    #rcodesign sign --p12-file ~/.p12/rustdesk-developer-id.p12 --p12-password-file ~/.p12/.cert-pass --code-signature-flags runtime ./target/release/bundle/osx/RustDesk.app/Contents/MacOS/libsciter.dylib
-    #rcodesign sign --p12-file ~/.p12/rustdesk-developer-id.p12 --p12-password-file ~/.p12/.cert-pass --code-signature-flags runtime ./target/release/bundle/osx/RustDesk.app
+    #rcodesign sign --p12-file ~/.p12/timedesk-developer-id.p12 --p12-password-file ~/.p12/.cert-pass --code-signature-flags runtime ./target/release/bundle/osx/TimeDesk.app/Contents/MacOS/rustdesk
+    #rcodesign sign --p12-file ~/.p12/timedesk-developer-id.p12 --p12-password-file ~/.p12/.cert-pass --code-signature-flags runtime ./target/release/bundle/osx/TimeDesk.app/Contents/MacOS/libsciter.dylib
+    #rcodesign sign --p12-file ~/.p12/timedesk-developer-id.p12 --p12-password-file ~/.p12/.cert-pass --code-signature-flags runtime ./target/release/bundle/osx/TimeDesk.app
     # goto "Keychain Access" -> "My Certificates" for below id which starts with "Developer ID Application:"
-    codesign -s "Developer ID Application: {0}" --force --options runtime  ./target/release/bundle/osx/RustDesk.app/Contents/MacOS/*
-    codesign -s "Developer ID Application: {0}" --force --options runtime  ./target/release/bundle/osx/RustDesk.app
+    codesign -s "Developer ID Application: {0}" --force --options runtime  ./target/release/bundle/osx/TimeDesk.app/Contents/MacOS/*
+    codesign -s "Developer ID Application: {0}" --force --options runtime  ./target/release/bundle/osx/TimeDesk.app
     '''.format(pa))
                 system2(
-                    'create-dmg "RustDesk %s.dmg" "target/release/bundle/osx/RustDesk.app"' % version)
-                os.rename('RustDesk %s.dmg' %
-                          version, 'rustdesk-%s.dmg' % version)
+                    'create-dmg "TimeDesk %s.dmg" "target/release/bundle/osx/TimeDesk.app"' % version)
+                os.rename('TimeDesk %s.dmg' %
+                          version, 'timedesk-%s.dmg' % version)
                 if pa:
                     system2('''
     # https://pyoxidizer.readthedocs.io/en/apple-codesign-0.14.0/apple_codesign.html
     # https://pyoxidizer.readthedocs.io/en/stable/tugger_code_signing.html
     # https://developer.apple.com/developer-id/
     # goto xcode and login with apple id, manager certificates (Developer ID Application and/or Developer ID Installer) online there (only download and double click (install) cer file can not export p12 because no private key)
-    #rcodesign sign --p12-file ~/.p12/rustdesk-developer-id.p12 --p12-password-file ~/.p12/.cert-pass --code-signature-flags runtime ./rustdesk-{1}.dmg
-    codesign -s "Developer ID Application: {0}" --force --options runtime ./rustdesk-{1}.dmg
+    #rcodesign sign --p12-file ~/.p12/timedesk-developer-id.p12 --p12-password-file ~/.p12/.cert-pass --code-signature-flags runtime ./timedesk-{1}.dmg
+    codesign -s "Developer ID Application: {0}" --force --options runtime ./timedesk-{1}.dmg
     # https://appstoreconnect.apple.com/access/api
     # https://gregoryszorc.com/docs/apple-codesign/stable/apple_codesign_getting_started.html#apple-codesign-app-store-connect-api-key
     # p8 file is generated when you generate api key (can download only once)
-    rcodesign notary-submit --api-key-path ../.p12/api-key.json  --staple rustdesk-{1}.dmg
-    # verify:  spctl -a -t exec -v /Applications/RustDesk.app
+    rcodesign notary-submit --api-key-path ../.p12/api-key.json  --staple timedesk-{1}.dmg
+    # verify:  spctl -a -t exec -v /Applications/TimeDesk.app
     '''.format(pa, version))
                 else:
                     print('Not signed')
             else:
                 # build deb package
                 system2(
-                    'mv target/release/bundle/deb/rustdesk*.deb ./rustdesk.deb')
-                system2('dpkg-deb -R rustdesk.deb tmpdeb')
-                system2('mkdir -p tmpdeb/usr/share/rustdesk/files/systemd/')
+                    'mv target/release/bundle/deb/rustdesk*.deb ./timedesk.deb')
+                system2('dpkg-deb -R timedesk.deb tmpdeb')
+                system2('mkdir -p tmpdeb/usr/share/timedesk/files/systemd/')
                 system2('mkdir -p tmpdeb/usr/share/icons/hicolor/256x256/apps/')
                 system2('mkdir -p tmpdeb/usr/share/icons/hicolor/scalable/apps/')
                 system2(
-                    'cp res/rustdesk.service tmpdeb/usr/share/rustdesk/files/systemd/')
+                    'cp res/timedesk.service tmpdeb/usr/share/timedesk/files/systemd/')
                 system2(
-                    'cp res/128x128@2x.png tmpdeb/usr/share/icons/hicolor/256x256/apps/rustdesk.png')
+                    'cp res/128x128@2x.png tmpdeb/usr/share/icons/hicolor/256x256/apps/timedesk.png')
                 system2(
-                    'cp res/scalable.svg tmpdeb/usr/share/icons/hicolor/scalable/apps/rustdesk.svg')
+                    'cp res/scalable.svg tmpdeb/usr/share/icons/hicolor/scalable/apps/timedesk.svg')
                 system2(
-                    'cp res/rustdesk.desktop tmpdeb/usr/share/applications/rustdesk.desktop')
+                    'cp res/timedesk.desktop tmpdeb/usr/share/applications/timedesk.desktop')
                 system2(
-                    'cp res/rustdesk-link.desktop tmpdeb/usr/share/applications/rustdesk-link.desktop')
+                    'cp res/timedesk-link.desktop tmpdeb/usr/share/applications/timedesk-link.desktop')
                 os.system('cp -a DEBIAN/* tmpdeb/DEBIAN/')
                 system2('strip tmpdeb/usr/bin/rustdesk')
-                system2('mkdir -p tmpdeb/usr/share/rustdesk')
-                system2('mv tmpdeb/usr/bin/rustdesk tmpdeb/usr/share/rustdesk/')
-                system2('cp libsciter-gtk.so tmpdeb/usr/share/rustdesk/')
+                system2('mkdir -p tmpdeb/usr/share/timedesk')
+                system2('mv tmpdeb/usr/bin/rustdesk tmpdeb/usr/share/timedesk/timedesk')
+                system2('cp libsciter-gtk.so tmpdeb/usr/share/timedesk/')
                 md5_file_folder("tmpdeb/")
-                system2('dpkg-deb -b tmpdeb rustdesk.deb; /bin/rm -rf tmpdeb/')
-                os.rename('rustdesk.deb', 'rustdesk-%s.deb' % version)
+                system2('dpkg-deb -b tmpdeb timedesk.deb; /bin/rm -rf tmpdeb/')
+                os.rename('timedesk.deb', 'timedesk-%s.deb' % version)
 
 
 def md5_file(fn):

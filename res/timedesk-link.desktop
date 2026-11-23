@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=TimeDesk
+NoDisplay=true
+MimeType=x-scheme-handler/timedesk;
+TryExec=timedesk
+Exec=timedesk %u
+Icon=timedesk
+Terminal=false
+Type=Application
+StartupNotify=false
+StartupWMClass=timedesk

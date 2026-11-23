@@ -128,7 +128,26 @@ pub fn init_sodium() {
     }
 }
 
+/// Product name this build ships under. It replaces hbb_common's default
+/// "RustDesk" so config paths, the service name, the URI scheme and translated
+/// strings all use it, the same way a custom client's `app-name` does.
+pub const BRAND_APP_NAME: &str = "TimeDesk";
+
+/// Applies [`BRAND_APP_NAME`] once per process, before anything reads `APP_NAME`.
+/// A signed custom client config read afterwards can still override it.
+pub fn init_app_name() {
+    static INIT: std::sync::Once = std::sync::Once::new();
+    INIT.call_once(|| {
+        if let Ok(mut name) = config::APP_NAME.write() {
+            if name.as_str() == "RustDesk" {
+                *name = BRAND_APP_NAME.to_owned();
+            }
+        }
+    });
+}
+
 pub fn global_init() -> bool {
+    init_app_name();
     init_sodium();
     #[cfg(all(target_os = "linux", feature = "drm"))]
     crate::platform::linux::dispatch_wayland_display_probe();
@@ -2516,6 +2535,7 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
 }
 
 pub fn load_custom_client() {
+    init_app_name();
     #[cfg(debug_assertions)]
     if let Ok(data) = std::fs::read_to_string("./custom.txt") {
         read_custom_client(data.trim());
@@ -2614,6 +2634,7 @@ pub fn get_dst_align_rgba() -> usize {
 }
 
 pub fn read_custom_client(config: &str) {
+    init_app_name();
     let Ok(data) = decode64(config) else {
         log::error!("Failed to decode custom client config");
         return;
