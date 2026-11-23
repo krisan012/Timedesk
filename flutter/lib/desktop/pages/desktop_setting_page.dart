@@ -29,7 +29,7 @@ import '../../common/widgets/dialog.dart';
 import '../../common/widgets/login.dart';
 
 const double _kTabWidth = 200;
-const double _kTabHeight = 42;
+const double _kTabHeight = 34;
 const double _kCardFixedWidth = 540;
 const double _kCardLeftMargin = 15;
 const double _kContentHMargin = 15;
@@ -37,8 +37,8 @@ const double _kContentHSubMargin = _kContentHMargin + 33;
 const double _kCheckBoxLeftMargin = 10;
 const double _kRadioLeftMargin = 10;
 const double _kListViewBottomMargin = 15;
-const double _kTitleFontSize = 20;
-const double _kContentFontSize = 15;
+const double _kTitleFontSize = 17;
+const double _kContentFontSize = 13.5;
 const Color _accentColor = MyTheme.accent;
 const String _kSettingPageControllerTag = 'settingPageController';
 const String _kSettingPageTabKeyTag = 'settingPageTabKey';
@@ -310,9 +310,8 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
       translate('Settings'),
       textAlign: TextAlign.left,
       style: const TextStyle(
-        color: _accentColor,
-        fontSize: _kTitleFontSize,
-        fontWeight: FontWeight.w400,
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
       ),
     );
     return Row(
@@ -352,12 +351,39 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
     );
   }
 
+  // macOS System Settings style: a tinted icon tile per section, and the
+  // selected row filled with the accent color.
+  static Color _tabTint(String label) {
+    switch (label) {
+      case 'Security':
+        return const Color(0xFF5E5CE6);
+      case 'Network':
+        return const Color(0xFF007AFF);
+      case 'Display':
+        return const Color(0xFF32ADE6);
+      case 'Account':
+        return const Color(0xFFFF9500);
+      case 'About':
+        return const Color(0xFFC12126);
+      default:
+        return const Color(0xFF8E8E93);
+    }
+  }
+
   Widget _listItem({required _TabInfo tab}) {
     return Obx(() {
       bool selected = tab.key == selectedTab.value;
-      return SizedBox(
+      final dark = Theme.of(context).brightness == Brightness.dark;
+      final accent = dark ? MyTheme.accentDark : MyTheme.accent;
+      return Container(
         width: _kTabWidth,
         height: _kTabHeight,
+        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 1),
+        decoration: BoxDecoration(
+          color: selected ? accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: () {
             if (selectedTab.value != tab.key) {
@@ -371,19 +397,18 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
           },
           child: Row(children: [
             Container(
-              width: 4,
-              height: _kTabHeight * 0.7,
-              color: selected ? _accentColor : null,
-            ),
-            Icon(
-              selected ? tab.selected : tab.unselected,
-              color: selected ? _accentColor : null,
-              size: 20,
-            ).marginOnly(left: 13, right: 10),
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: _tabTint(tab.label),
+                borderRadius: BorderRadius.circular(5),
+              ),
+              child: Icon(tab.selected, color: Colors.white, size: 15),
+            ).marginOnly(left: 8, right: 9),
             Text(
               translate(tab.label),
               style: TextStyle(
-                  color: selected ? _accentColor : null,
+                  color: selected ? Colors.white : null,
                   fontWeight: FontWeight.w400,
                   fontSize: _kContentFontSize),
             ),
@@ -2690,6 +2715,15 @@ Widget _Card(
         child: SizedBox(
           width: _kCardFixedWidth,
           child: Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: BorderSide(
+                  color: MyTheme.currentThemeMode() == ThemeMode.dark
+                      ? MyTheme.macSeparatorDark
+                      : const Color(0xFFE3E3E8),
+                  width: 0.5),
+            ),
             child: Column(
               children: [
                 Row(
@@ -2699,7 +2733,8 @@ Widget _Card(
                       translate(title),
                       textAlign: TextAlign.start,
                       style: const TextStyle(
-                        fontSize: _kTitleFontSize,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
                       ),
                     )),
                     ...?title_suffix

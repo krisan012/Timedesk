@@ -167,10 +167,10 @@ class ColorThemeExtension extends ThemeExtension<ColorThemeExtension> {
   final Color? divider;
 
   static final light = ColorThemeExtension(
-    border: Color(0xFFCCCCCC),
-    border2: Color(0xFFBBBBBB),
+    border: Color(0xFFD2D2D7),
+    border2: Color(0xFFC7C7CC),
     border3: Colors.black26,
-    highlight: Color(0xFFE5E5E5),
+    highlight: Color(0xFFE5E5EA),
     drag_indicator: Colors.grey[800],
     shadow: Colors.black,
     errorBannerBg: Color(0xFFFDEEEB),
@@ -181,10 +181,10 @@ class ColorThemeExtension extends ThemeExtension<ColorThemeExtension> {
   );
 
   static final dark = ColorThemeExtension(
-    border: Color(0xFF555555),
+    border: Color(0xFF3A3A3C),
     border2: Color(0xFFE5E5E5),
     border3: Colors.white24,
-    highlight: Color(0xFF3F3F3F),
+    highlight: Color(0xFF3A3A3C),
     drag_indicator: Colors.grey,
     shadow: Colors.grey,
     errorBannerBg: Color(0xFF470F2D),
@@ -248,17 +248,27 @@ class ColorThemeExtension extends ThemeExtension<ColorThemeExtension> {
 class MyTheme {
   MyTheme._();
 
-  static const Color grayBg = Color(0xFFEFEFF2);
-  static const Color accent = Color(0xFF0071FF);
-  static const Color accent50 = Color(0x770071FF);
-  static const Color accent80 = Color(0xAA0071FF);
+  // macOS-style palette (system colors from Apple's HIG).
+  static const Color grayBg = Color(0xFFF5F5F7);
+  static const Color accent = Color(0xFF007AFF);
+  static const Color accentDark = Color(0xFF0A84FF);
+  static const Color accent50 = Color(0x77007AFF);
+  static const Color accent80 = Color(0xAA007AFF);
+  static const Color macSidebarLight = Color(0xFFEDEDF0);
+  static const Color macSidebarDark = Color(0xFF29292C);
+  static const Color macWindowDark = Color(0xFF1E1E1F);
+  static const Color macGroupDark = Color(0xFF2C2C2E);
+  static const Color macSeparatorLight = Color(0xFFD2D2D7);
+  static const Color macSeparatorDark = Color(0xFF3A3A3C);
+  static const Color macLabel = Color(0xFF1D1D1F);
+  static const Color macSecondaryLabel = Color(0xFF86868B);
   static const Color canvasColor = Color(0xFF212121);
   static const Color border = Color(0xFFCCCCCC);
   static const Color idColor = Color(0xFF00B6F0);
   static const Color darkGray = Color.fromARGB(255, 148, 148, 148);
   static const Color cmIdColor = Color(0xFF21790B);
   static const Color dark = Colors.black87;
-  static const Color button = Color(0xFF2C8CFF);
+  static const Color button = Color(0xFF007AFF);
   static const Color hoverBorder = Color(0xFF999999);
 
   // ListTile
@@ -285,10 +295,36 @@ class MyTheme {
     splashRadius: 0,
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.all(
-        Radius.circular(5),
+        Radius.circular(4),
       ),
     ),
   );
+
+  static SwitchThemeData macSwitchTheme(bool dark) {
+    return SwitchThemeData(
+      splashRadius: (isDesktop || isWebDesktop) ? 0 : kRadialReactionRadius,
+      thumbColor: MaterialStateProperty.all(Colors.white),
+      trackColor: MaterialStateProperty.resolveWith((states) {
+        if (states.contains(MaterialState.selected)) {
+          return dark ? accentDark : accent;
+        }
+        return dark ? const Color(0xFF48484A) : const Color(0xFFE5E5EA);
+      }),
+    );
+  }
+
+  static InputDecorationTheme macInputTheme(bool dark) {
+    final border = dark ? macSeparatorDark : macSeparatorLight;
+    return InputDecorationTheme(
+      fillColor: dark ? macGroupDark : Colors.white,
+      filled: true,
+      isDense: true,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: BorderSide(color: border),
+      ),
+    );
+  }
 
   // TextButton
   // Value is used to calculate "dialog.actionsPadding"
@@ -344,14 +380,15 @@ class MyTheme {
       : EdgeInsets.only(left: dialogPadding / 3);
 
   static ScrollbarThemeData scrollbarTheme = ScrollbarThemeData(
-    thickness: MaterialStateProperty.all(6),
+    thickness: MaterialStateProperty.all(7),
+    radius: const Radius.circular(4),
     thumbColor: MaterialStateProperty.resolveWith<Color?>((states) {
       if (states.contains(MaterialState.dragged)) {
-        return Colors.grey[900];
+        return Colors.black54;
       } else if (states.contains(MaterialState.hovered)) {
-        return Colors.grey[700];
+        return Colors.black45;
       } else {
-        return Colors.grey[500];
+        return Colors.black26;
       }
     }),
     crossAxisMargin: 4,
@@ -360,11 +397,11 @@ class MyTheme {
   static ScrollbarThemeData scrollbarThemeDark = scrollbarTheme.copyWith(
     thumbColor: MaterialStateProperty.resolveWith<Color?>((states) {
       if (states.contains(MaterialState.dragged)) {
-        return Colors.grey[100];
+        return Colors.white60;
       } else if (states.contains(MaterialState.hovered)) {
-        return Colors.grey[300];
+        return Colors.white38;
       } else {
-        return Colors.grey[500];
+        return Colors.white24;
       }
     }),
   );
@@ -373,42 +410,34 @@ class MyTheme {
     // https://stackoverflow.com/questions/77537315/after-upgrading-to-flutter-3-16-the-app-bar-background-color-button-size-and
     useMaterial3: false,
     brightness: Brightness.light,
-    hoverColor: Color.fromARGB(255, 224, 224, 224),
+    hoverColor: Color(0x0F000000),
     scaffoldBackgroundColor: Colors.white,
-    dialogBackgroundColor: Colors.white,
+    dialogBackgroundColor: Color(0xFFF6F6F6),
+    dividerColor: macSeparatorLight,
     appBarTheme: AppBarTheme(
       shadowColor: Colors.transparent,
     ),
     dialogTheme: DialogTheme(
-      elevation: 15,
+      elevation: 24,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18.0),
+        borderRadius: BorderRadius.circular(12.0),
         side: BorderSide(
-          width: 1,
-          color: grayBg,
+          width: 0.5,
+          color: Color(0x33000000),
         ),
       ),
     ),
     scrollbarTheme: scrollbarTheme,
-    inputDecorationTheme: isDesktop
-        ? InputDecorationTheme(
-            fillColor: grayBg,
-            filled: true,
-            isDense: true,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          )
-        : null,
+    inputDecorationTheme: isDesktop ? macInputTheme(false) : null,
     textTheme: const TextTheme(
-        titleLarge: TextStyle(fontSize: 19, color: Colors.black87),
-        titleSmall: TextStyle(fontSize: 14, color: Colors.black87),
-        bodySmall: TextStyle(fontSize: 12, color: Colors.black87, height: 1.25),
-        bodyMedium:
-            TextStyle(fontSize: 14, color: Colors.black87, height: 1.25),
-        labelLarge: TextStyle(fontSize: 16.0, color: MyTheme.accent80)),
+        titleLarge: TextStyle(
+            fontSize: 19, color: macLabel, fontWeight: FontWeight.w600),
+        titleSmall: TextStyle(fontSize: 13.5, color: macLabel),
+        bodySmall: TextStyle(fontSize: 12, color: macLabel, height: 1.25),
+        bodyMedium: TextStyle(fontSize: 13.5, color: macLabel, height: 1.25),
+        labelLarge: TextStyle(fontSize: 15.0, color: MyTheme.accent)),
     cardColor: grayBg,
-    hintColor: Color(0xFFAAAAAA),
+    hintColor: Color(0xFFB0B0B5),
     visualDensity: VisualDensity.adaptivePlatformDensity,
     tabBarTheme: const TabBarTheme(
       labelColor: Colors.black87,
@@ -422,7 +451,7 @@ class MyTheme {
             style: TextButton.styleFrom(
               splashFactory: NoSplash.splashFactory,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18.0),
+                borderRadius: BorderRadius.circular(6.0),
               ),
             ),
           )
@@ -430,21 +459,25 @@ class MyTheme {
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: MyTheme.accent,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        shadowColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
+          borderRadius: BorderRadius.circular(6.0),
         ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        backgroundColor: grayBg,
-        foregroundColor: Colors.black87,
+        backgroundColor: Colors.white,
+        foregroundColor: macLabel,
+        side: BorderSide(color: macSeparatorLight),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
+          borderRadius: BorderRadius.circular(6.0),
         ),
       ),
     ),
-    switchTheme: switchTheme(),
+    switchTheme: macSwitchTheme(false),
     radioTheme: radioTheme(),
     checkboxTheme: checkboxTheme,
     listTileTheme: listTileTheme,
@@ -452,13 +485,13 @@ class MyTheme {
         style:
             MenuStyle(backgroundColor: MaterialStatePropertyAll(Colors.white))),
     colorScheme: ColorScheme.light(
-        primary: Colors.blue, secondary: accent, background: grayBg),
+        primary: accent, secondary: accent, background: macSidebarLight),
     popupMenuTheme: PopupMenuThemeData(
         color: Colors.white,
         shape: RoundedRectangleBorder(
           side: BorderSide(
               color: (isDesktop || isWebDesktop)
-                  ? Color(0xFFECECEC)
+                  ? macSeparatorLight
                   : Colors.transparent),
           borderRadius: BorderRadius.all(Radius.circular(8.0)),
         )),
@@ -471,45 +504,39 @@ class MyTheme {
   static ThemeData darkTheme = ThemeData(
     useMaterial3: false,
     brightness: Brightness.dark,
-    hoverColor: Color.fromARGB(255, 45, 46, 53),
-    scaffoldBackgroundColor: Color(0xFF18191E),
-    dialogBackgroundColor: Color(0xFF18191E),
+    hoverColor: Color(0x14FFFFFF),
+    scaffoldBackgroundColor: macWindowDark,
+    dialogBackgroundColor: Color(0xFF2A2A2C),
+    dividerColor: macSeparatorDark,
     appBarTheme: AppBarTheme(
       shadowColor: Colors.transparent,
     ),
     dialogTheme: DialogTheme(
-      elevation: 15,
+      elevation: 24,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18.0),
+        borderRadius: BorderRadius.circular(12.0),
         side: BorderSide(
-          width: 1,
-          color: Color(0xFF24252B),
+          width: 0.5,
+          color: Color(0x33FFFFFF),
         ),
       ),
     ),
     scrollbarTheme: scrollbarThemeDark,
-    inputDecorationTheme: (isDesktop || isWebDesktop)
-        ? InputDecorationTheme(
-            fillColor: Color(0xFF24252B),
-            filled: true,
-            isDense: true,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          )
-        : null,
+    inputDecorationTheme:
+        (isDesktop || isWebDesktop) ? macInputTheme(true) : null,
     textTheme: const TextTheme(
-      titleLarge: TextStyle(fontSize: 19),
-      titleSmall: TextStyle(fontSize: 14),
-      bodySmall: TextStyle(fontSize: 12, height: 1.25),
-      bodyMedium: TextStyle(fontSize: 14, height: 1.25),
+      titleLarge: TextStyle(
+          fontSize: 19, color: Color(0xFFF5F5F7), fontWeight: FontWeight.w600),
+      titleSmall: TextStyle(fontSize: 13.5, color: Color(0xFFF5F5F7)),
+      bodySmall: TextStyle(fontSize: 12, height: 1.25, color: Color(0xFFE5E5EA)),
+      bodyMedium:
+          TextStyle(fontSize: 13.5, height: 1.25, color: Color(0xFFF5F5F7)),
       labelLarge: TextStyle(
-        fontSize: 16.0,
-        fontWeight: FontWeight.bold,
-        color: accent80,
+        fontSize: 15.0,
+        color: accentDark,
       ),
     ),
-    cardColor: Color(0xFF24252B),
+    cardColor: macGroupDark,
     visualDensity: VisualDensity.adaptivePlatformDensity,
     tabBarTheme: const TabBarTheme(
       labelColor: Colors.white70,
@@ -525,46 +552,49 @@ class MyTheme {
               disabledForegroundColor: Colors.white70,
               foregroundColor: Colors.white70,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18.0),
+                borderRadius: BorderRadius.circular(6.0),
               ),
             ),
           )
         : mobileTextButtonTheme,
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: MyTheme.accent,
+        backgroundColor: MyTheme.accentDark,
         foregroundColor: Colors.white,
         disabledForegroundColor: Colors.white70,
         disabledBackgroundColor: Colors.white10,
+        elevation: 0,
+        shadowColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
+          borderRadius: BorderRadius.circular(6.0),
         ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        backgroundColor: Color(0xFF24252B),
+        backgroundColor: Color(0xFF3A3A3C),
         side: BorderSide(color: Colors.white12, width: 0.5),
         disabledForegroundColor: Colors.white70,
-        foregroundColor: Colors.white70,
+        foregroundColor: Color(0xFFF5F5F7),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
+          borderRadius: BorderRadius.circular(6.0),
         ),
       ),
     ),
-    switchTheme: switchTheme(),
+    switchTheme: macSwitchTheme(true),
     radioTheme: radioTheme(),
     checkboxTheme: checkboxTheme,
     listTileTheme: listTileTheme,
     menuBarTheme: MenuBarThemeData(
         style: MenuStyle(
-            backgroundColor: MaterialStatePropertyAll(Color(0xFF121212)))),
+            backgroundColor: MaterialStatePropertyAll(Color(0xFF2A2A2C)))),
     colorScheme: ColorScheme.dark(
-      primary: Colors.blue,
-      secondary: accent,
-      background: Color(0xFF24252B),
+      primary: accentDark,
+      secondary: accentDark,
+      background: macSidebarDark,
     ),
     popupMenuTheme: PopupMenuThemeData(
+        color: Color(0xFF2A2A2C),
         shape: RoundedRectangleBorder(
       side: BorderSide(color: Colors.white24),
       borderRadius: BorderRadius.all(Radius.circular(8.0)),
