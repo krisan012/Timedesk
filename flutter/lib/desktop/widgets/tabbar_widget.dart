@@ -653,8 +653,8 @@ class _DesktopTabState extends State<DesktopTab>
                         ),
                         Offstage(
                             offstage: !showTitle,
-                            child: const Text(
-                              "RustDesk",
+                            child: Text(
+                              bind.mainGetAppNameSync(),
                               style: TextStyle(fontSize: 13),
                             ).marginOnly(left: 2))
                       ]).marginOnly(
@@ -779,39 +779,16 @@ class WindowActionPanelState extends State<WindowActionPanel> {
           }
         }),
         if (widget.tail != null) widget.tail!,
-        if (!kUseCompatibleUiMode)
+        if (!kUseCompatibleUiMode && !isMacOS)
+          // macOS-style "traffic light" window controls on Windows/Linux.
+          // On macOS the native buttons are used instead.
           Row(
             children: [
-              if (widget.showMinimize && !isMacOS)
-                ActionIcon(
-                  message: 'Minimize',
-                  icon: IconFont.min,
-                  onTap: () {
-                    if (widget.isMainWindow) {
-                      windowManager.minimize();
-                    } else {
-                      WindowController.fromWindowId(kWindowId!).minimize();
-                    }
-                  },
-                  isClose: false,
-                ),
-              if (widget.showMaximize && !isMacOS)
-                Obx(() => ActionIcon(
-                      message: stateGlobal.isMaximized.isTrue
-                          ? 'Restore'
-                          : 'Maximize',
-                      icon: stateGlobal.isMaximized.isTrue
-                          ? IconFont.restore
-                          : IconFont.max,
-                      onTap: bind.isIncomingOnly() && isInHomePage()
-                          ? null
-                          : _toggleMaximize,
-                      isClose: false,
-                    )),
-              if (widget.showClose && !isMacOS)
-                ActionIcon(
+              if (widget.showClose)
+                MacWindowDot(
                   message: 'Close',
-                  icon: IconFont.close,
+                  color: const Color(0xFFFF5F57),
+                  glyph: Icons.close,
                   onTap: () async {
                     final res = await widget.onClose?.call() ?? true;
                     if (res) {
@@ -827,8 +804,34 @@ class WindowActionPanelState extends State<WindowActionPanel> {
                       });
                     }
                   },
-                  isClose: true,
-                )
+                ),
+              if (widget.showMinimize)
+                MacWindowDot(
+                  message: 'Minimize',
+                  color: const Color(0xFFFEBC2E),
+                  glyph: Icons.remove,
+                  onTap: () {
+                    if (widget.isMainWindow) {
+                      windowManager.minimize();
+                    } else {
+                      WindowController.fromWindowId(kWindowId!).minimize();
+                    }
+                  },
+                ),
+              if (widget.showMaximize)
+                Obx(() => MacWindowDot(
+                      message: stateGlobal.isMaximized.isTrue
+                          ? 'Restore'
+                          : 'Maximize',
+                      color: const Color(0xFF28C840),
+                      glyph: stateGlobal.isMaximized.isTrue
+                          ? Icons.close_fullscreen
+                          : Icons.open_in_full,
+                      onTap: bind.isIncomingOnly() && isInHomePage()
+                          ? null
+                          : _toggleMaximize,
+                    )),
+              const SizedBox(width: 10),
             ],
           ),
       ],
@@ -1261,6 +1264,57 @@ class _CloseButton extends StatelessWidget {
   }
 }
 
+/// A macOS-style round window control ("traffic light").
+class MacWindowDot extends StatelessWidget {
+  final String message;
+  final Color color;
+  final IconData glyph;
+  final GestureTapCallback? onTap;
+
+  const MacWindowDot(
+      {Key? key,
+      required this.message,
+      required this.color,
+      required this.glyph,
+      this.onTap})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final hover = false.obs;
+    final enabled = onTap != null;
+    return Tooltip(
+      message: translate(message),
+      waitDuration: const Duration(seconds: 1),
+      child: MouseRegion(
+        onEnter: (_) => hover.value = true,
+        onExit: (_) => hover.value = false,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 20,
+            height: _kTabBarHeight - 1,
+            alignment: Alignment.center,
+            child: Obx(() => Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: enabled ? color : const Color(0xFFCDCDD1),
+                    border: Border.all(
+                        color: Colors.black.withOpacity(0.12), width: 0.5),
+                  ),
+                  child: hover.value && enabled
+                      ? Icon(glyph, size: 8, color: Colors.black54)
+                      : null,
+                )),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class ActionIcon extends StatefulWidget {
   final String? message;
   final IconData icon;
@@ -1470,27 +1524,27 @@ class TabbarTheme extends ThemeExtension<TabbarTheme> {
 
   static const light = TabbarTheme(
       selectedTabIconColor: MyTheme.accent,
-      unSelectedTabIconColor: Color.fromARGB(255, 162, 203, 241),
-      selectedTextColor: Colors.black,
-      unSelectedTextColor: Color.fromARGB(255, 112, 112, 112),
-      selectedIconColor: Color.fromARGB(255, 26, 26, 26),
-      unSelectedIconColor: Color.fromARGB(255, 96, 96, 96),
-      dividerColor: Color.fromARGB(255, 238, 238, 238),
-      hoverColor: Colors.white54,
+      unSelectedTabIconColor: MyTheme.macSecondaryLabel,
+      selectedTextColor: MyTheme.macLabel,
+      unSelectedTextColor: MyTheme.macSecondaryLabel,
+      selectedIconColor: MyTheme.macLabel,
+      unSelectedIconColor: MyTheme.macSecondaryLabel,
+      dividerColor: MyTheme.macSeparatorLight,
+      hoverColor: Color(0x0F000000),
       closeHoverColor: Colors.white,
-      selectedTabBackgroundColor: Colors.white54);
+      selectedTabBackgroundColor: Colors.white);
 
   static const dark = TabbarTheme(
-      selectedTabIconColor: MyTheme.accent,
-      unSelectedTabIconColor: Color.fromARGB(255, 30, 65, 98),
-      selectedTextColor: Colors.white,
-      unSelectedTextColor: Color.fromARGB(255, 192, 192, 192),
-      selectedIconColor: Color.fromARGB(255, 192, 192, 192),
-      unSelectedIconColor: Color.fromARGB(255, 255, 255, 255),
-      dividerColor: Color.fromARGB(255, 64, 64, 64),
-      hoverColor: Colors.black26,
+      selectedTabIconColor: MyTheme.accentDark,
+      unSelectedTabIconColor: Color(0xFF98989D),
+      selectedTextColor: Color(0xFFF5F5F7),
+      unSelectedTextColor: Color(0xFF98989D),
+      selectedIconColor: Color(0xFFE5E5EA),
+      unSelectedIconColor: Color(0xFF98989D),
+      dividerColor: MyTheme.macSeparatorDark,
+      hoverColor: Color(0x14FFFFFF),
       closeHoverColor: Colors.black,
-      selectedTabBackgroundColor: Colors.black26);
+      selectedTabBackgroundColor: Color(0xFF3A3A3C));
 
   @override
   ThemeExtension<TabbarTheme> copyWith({
