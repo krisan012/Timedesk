@@ -143,7 +143,23 @@ pub fn init_app_name() {
                 *name = BRAND_APP_NAME.to_owned();
             }
         }
+        init_brand_server();
     });
+}
+
+pub const BRAND_RENDEZVOUS_SERVER: &str = "timedesk.timelapsesoftware.com";
+pub const BRAND_RS_PUB_KEY: &str = "pDmlzxHT2f7X6aE5Lg8J2TmMmUbXCam0ZsbHCEFZbtI=";
+
+/// Defaults, not overrides: a value the user saves in Network settings, or a
+/// signed custom.txt, still wins.
+fn init_brand_server() {
+    let mut defaults = config::DEFAULT_SETTINGS.write().unwrap();
+    defaults
+        .entry(keys::OPTION_CUSTOM_RENDEZVOUS_SERVER.to_owned())
+        .or_insert_with(|| BRAND_RENDEZVOUS_SERVER.to_owned());
+    defaults
+        .entry(keys::OPTION_KEY.to_owned())
+        .or_insert_with(|| BRAND_RS_PUB_KEY.to_owned());
 }
 
 pub fn global_init() -> bool {
@@ -3131,6 +3147,16 @@ mod tests {
         self,
         time::{interval, interval_at, sleep, Duration, Instant, Interval},
     };
+
+    #[test]
+    fn brand_server_is_the_default_id_server_and_key() {
+        init_app_name();
+        assert_eq!(
+            Config::get_rendezvous_server(),
+            format!("{BRAND_RENDEZVOUS_SERVER}:{RENDEZVOUS_PORT}")
+        );
+        assert_eq!(Config::get_option(keys::OPTION_KEY), BRAND_RS_PUB_KEY);
+    }
 
     #[test]
     fn relay_uuid_rejects_control_bytes_but_not_other_id_formats() {
