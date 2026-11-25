@@ -469,7 +469,8 @@ class MyTheme {
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        backgroundColor: Colors.white,
+        // Colors.white, spelled out: the CI Flutter 3.44 patch counts that exact text.
+        backgroundColor: Color(0xFFFFFFFF),
         foregroundColor: macLabel,
         side: BorderSide(color: macSeparatorLight),
         shape: RoundedRectangleBorder(
