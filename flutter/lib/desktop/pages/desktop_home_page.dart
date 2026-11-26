@@ -42,6 +42,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   @override
   bool get wantKeepAlive => true;
   var systemError = '';
+  // Set by the TimeDesk check-in when Timelapse changed this PC's ID or password.
+  var timedeskNotice = '';
   StreamSubscription? _uniLinksSubscription;
   var svcStopped = false.obs;
   var watchIsCanScreenRecording = false;
@@ -536,6 +538,12 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget buildHelpCards(String updateUrl) {
+    if (bind.isIncomingOnly() && timedeskNotice.isNotEmpty) {
+      return buildInstallCard("", timedeskNotice, "OK", () async {
+        await bind.mainSetOption(key: 'timedesk-notice', value: '');
+        setState(() => timedeskNotice = '');
+      });
+    }
     if (isWindows &&
         !bind.isDisableInstallation() &&
         bind.mainIsInstalled() &&
@@ -875,6 +883,11 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       if (bind.isIncomingOnly()) {
         _permanentPasswordSet.value =
             (await bind.mainGetCommon(key: "permanent-password-set")) == "true";
+        final notice = await bind.mainGetOption(key: 'timedesk-notice');
+        if (notice != timedeskNotice) {
+          timedeskNotice = notice;
+          setState(() {});
+        }
       }
       final error = await bind.mainGetError();
       if (systemError != error) {

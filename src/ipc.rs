@@ -1870,7 +1870,7 @@ pub async fn set_permanent_password_with_ack(v: String) -> ResultType<bool> {
     set_permanent_password_with_ack_async(v).await
 }
 
-async fn set_permanent_password_with_ack_async(v: String) -> ResultType<bool> {
+pub(crate) async fn set_permanent_password_with_ack_async(v: String) -> ResultType<bool> {
     // The daemon ACK/NACK is expected quickly since it applies the config in-process.
     let ms_timeout = 1_000;
     let mut c = connect(ms_timeout, "").await?;
