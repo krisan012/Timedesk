@@ -150,16 +150,26 @@ pub fn init_app_name() {
 pub const BRAND_RENDEZVOUS_SERVER: &str = "timedesk.timelapsesoftware.com";
 pub const BRAND_RS_PUB_KEY: &str = "pDmlzxHT2f7X6aE5Lg8J2TmMmUbXCam0ZsbHCEFZbtI=";
 
-/// Defaults, not overrides: a value the user saves in Network settings, or a
-/// signed custom.txt, still wins.
+/// TimeDesk only talks to its own server: these overwrite anything saved
+/// earlier or imported, and the ID/Relay server settings are hidden.
+/// An empty relay/API server makes both follow the ID server.
 fn init_brand_server() {
-    let mut defaults = config::DEFAULT_SETTINGS.write().unwrap();
-    defaults
-        .entry(keys::OPTION_CUSTOM_RENDEZVOUS_SERVER.to_owned())
-        .or_insert_with(|| BRAND_RENDEZVOUS_SERVER.to_owned());
-    defaults
-        .entry(keys::OPTION_KEY.to_owned())
-        .or_insert_with(|| BRAND_RS_PUB_KEY.to_owned());
+    let mut overwrite = config::OVERWRITE_SETTINGS.write().unwrap();
+    for (k, v) in [
+        (keys::OPTION_CUSTOM_RENDEZVOUS_SERVER, BRAND_RENDEZVOUS_SERVER),
+        (keys::OPTION_KEY, BRAND_RS_PUB_KEY),
+        (keys::OPTION_RELAY_SERVER, ""),
+        (keys::OPTION_API_SERVER, ""),
+        // The open-source server supports neither; their switches are hidden.
+        (keys::OPTION_ALLOW_WEBSOCKET, "N"),
+        (keys::OPTION_DISABLE_UDP, "N"),
+    ] {
+        overwrite.insert(k.to_owned(), v.to_owned());
+    }
+    config::BUILTIN_SETTINGS
+        .write()
+        .unwrap()
+        .insert(keys::OPTION_HIDE_SERVER_SETTINGS.to_owned(), "Y".to_owned());
 }
 
 pub fn global_init() -> bool {
@@ -3151,6 +3161,10 @@ mod tests {
     #[test]
     fn brand_server_is_the_default_id_server_and_key() {
         init_app_name();
+        Config::set_option(
+            keys::OPTION_CUSTOM_RENDEZVOUS_SERVER.to_owned(),
+            "other.example.com".to_owned(),
+        );
         assert_eq!(
             Config::get_rendezvous_server(),
             format!("{BRAND_RENDEZVOUS_SERVER}:{RENDEZVOUS_PORT}")

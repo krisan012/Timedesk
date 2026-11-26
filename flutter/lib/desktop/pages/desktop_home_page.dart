@@ -11,6 +11,7 @@ import 'package:flutter_hbb/common/widgets/custom_password.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/connection_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
+import 'package:flutter_hbb/desktop/pages/host_password_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
 import 'package:flutter_hbb/desktop/widgets/update_progress.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
@@ -54,6 +55,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   final RxBool _block = false.obs;
 
   final GlobalKey _childKey = GlobalKey();
+  final _permanentPasswordSet = false.obs;
+  final _showPermanentPassword = false.obs;
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +66,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        buildLeftPane(context),
+        isIncomingOnly
+            ? Expanded(child: buildLeftPane(context))
+            : buildLeftPane(context),
         if (!isIncomingOnly) const VerticalDivider(width: 1),
         if (!isIncomingOnly) Expanded(child: buildRightPane(context)),
       ],
@@ -78,58 +83,47 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   Widget buildLeftPane(BuildContext context) {
     final isIncomingOnly = bind.isIncomingOnly();
     final isOutgoingOnly = bind.isOutgoingOnly();
-    final children = <Widget>[
-      if (!isOutgoingOnly) buildPresetPasswordWarning(),
-      Align(
-        alignment: Alignment.center,
-        child: loadLogo(),
-      ).marginOnly(bottom: 6),
-      buildTip(context),
-      if (!isOutgoingOnly)
-        _macGroup(context, [
-          buildIDBoard(context),
-          _macSeparator(context),
-          buildPasswordBoard(context),
-        ]),
-      if (!isOutgoingOnly) _buildTipText(context),
-      FutureBuilder<Widget>(
-        future: Future.value(
-            Obx(() => buildHelpCards(stateGlobal.updateUrl.value))),
-        builder: (_, data) {
-          if (data.hasData) {
-            if (isIncomingOnly) {
-              if (isInHomePage()) {
-                Future.delayed(Duration(milliseconds: 300), () {
-                  _updateWindowSize();
-                });
-              }
-            }
-            return data.data!;
-          } else {
-            return const Offstage();
-          }
-        },
-      ),
-    ];
-    if (isIncomingOnly) {
-      children.addAll([
-        Divider(),
-        OnlineStatusWidget(
-          onSvcStatusChanged: () {
+    final helpCards = FutureBuilder<Widget>(
+      future:
+          Future.value(Obx(() => buildHelpCards(stateGlobal.updateUrl.value))),
+      builder: (_, data) {
+        if (data.hasData) {
+          if (isIncomingOnly) {
             if (isInHomePage()) {
               Future.delayed(Duration(milliseconds: 300), () {
                 _updateWindowSize();
               });
             }
-          },
-        ).marginOnly(bottom: 6, right: 6)
-      ]);
-    }
+          }
+          return data.data!;
+        } else {
+          return const Offstage();
+        }
+      },
+    );
+    final children = isIncomingOnly
+        ? _incomingOnlyChildren(context, helpCards)
+        : <Widget>[
+            if (!isOutgoingOnly) buildPresetPasswordWarning(),
+            Align(
+              alignment: Alignment.center,
+              child: loadLogo(),
+            ).marginOnly(bottom: 6),
+            buildTip(context),
+            if (!isOutgoingOnly)
+              _macGroup(context, [
+                buildIDBoard(context),
+                _macSeparator(context),
+                buildPasswordBoard(context),
+              ]),
+            if (!isOutgoingOnly) _buildTipText(context),
+            helpCards,
+          ];
     final textColor = Theme.of(context).textTheme.titleLarge?.color;
     return ChangeNotifierProvider.value(
       value: gFFI.serverModel,
       child: Container(
-        width: isIncomingOnly ? 280.0 : 236.0,
+        width: isIncomingOnly ? null : 236.0,
         color: Theme.of(context).colorScheme.background,
         child: Stack(
           children: [
@@ -176,6 +170,66 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         ),
       ),
     );
+  }
+
+  // TimeDesk Host: a wide window, logo and tip on the left, ID/password on
+  // the right, online status across the bottom.
+  List<Widget> _incomingOnlyChildren(BuildContext context, Widget helpCards) {
+    return [
+      buildPresetPasswordWarning(),
+      // No IntrinsicHeight: the ID board uses a LayoutBuilder, which cannot
+      // report intrinsic sizes.
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 200,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                loadLogo(),
+                _buildTipText(context),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                buildTip(context),
+                _macGroup(context, [
+                  buildIDBoard(context),
+                  _macSeparator(context),
+                  buildPasswordBoard(context),
+                  Obx(() => _showPermanentPassword.value
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _macSeparator(context),
+                            _buildPermanentPasswordRow(context),
+                          ],
+                        )
+                      : const SizedBox.shrink()),
+                ]),
+                _buildPermanentPasswordToggle(context)
+                    .marginOnly(bottom: 12),
+              ],
+            ),
+          ),
+        ],
+      ).marginOnly(top: 20),
+      helpCards,
+      const Divider(height: 1),
+      OnlineStatusWidget(
+        onSvcStatusChanged: () {
+          if (isInHomePage()) {
+            Future.delayed(Duration(milliseconds: 300), () {
+              _updateWindowSize();
+            });
+          }
+        },
+      ).marginOnly(bottom: 6, right: 6),
+    ];
   }
 
   buildRightPane(BuildContext context) {
@@ -281,7 +335,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                     Clipboard.setData(ClipboardData(text: model.serverId.text));
                     showToast(translate("Copied"));
                   }),
-              buildPopupMenu(context),
+              // TimeDesk Host has no settings window and a fixed ID.
+              if (!bind.isIncomingOnly()) buildPopupMenu(context),
             ],
           ),
           GestureDetector(
@@ -358,12 +413,12 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                     icon: Icons.refresh_rounded,
                     tooltip: 'Refresh Password',
                     onTap: () => bind.mainUpdateTemporaryPassword()),
-              if (!bind.isDisableSettings())
+              if (!bind.isDisableSettings() && !bind.isIncomingOnly())
                 _macIconButton(context,
                     icon: Icons.edit_outlined,
                     tooltip: 'Change Password',
-                    onTap: () =>
-                        DesktopSettingPage.switch2page(SettingsTabKey.safety)),
+                    onTap: () => DesktopSettingPage.switch2page(
+                        SettingsTabKey.safety)),
             ],
           ),
           GestureDetector(
@@ -391,6 +446,63 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         ],
       ),
     );
+  }
+
+  // TimeDesk Host: the permanent password is never shown, only whether one
+  // is set, so it is not mistaken for the one-time password above.
+  Widget _buildPermanentPasswordRow(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 6, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: AutoSizeText(
+                  translate("Permanent Password"),
+                  style: _macCaption(context),
+                  maxLines: 1,
+                ),
+              ),
+              if (!bind.isDisableSettings())
+                _macIconButton(context,
+                    icon: Icons.edit_outlined,
+                    tooltip: 'Set permanent password',
+                    onTap: openHostPasswordWindow),
+            ],
+          ),
+          Obx(() => Text(
+                _permanentPasswordSet.value
+                    ? '●●●●●●●●  ${translate("Set")}'
+                    : translate("Not set"),
+                style: _permanentPasswordSet.value
+                    ? const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)
+                    : _macCaption(context).copyWith(fontSize: 13),
+              ).marginOnly(top: 4)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPermanentPasswordToggle(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(4),
+        onTap: () {
+          _showPermanentPassword.toggle();
+          Future.delayed(Duration(milliseconds: 300), _updateWindowSize);
+        },
+        child: Obx(() => Text(
+              translate(_showPermanentPassword.value
+                  ? "Hide permanent password"
+                  : "Show permanent password"),
+              style: _macCaption(context)
+                  .copyWith(fontSize: 11, fontWeight: FontWeight.w400),
+            ).paddingSymmetric(horizontal: 4, vertical: 2)),
+      ),
+    ).marginOnly(top: 4, right: 14);
   }
 
   buildTip(BuildContext context) {
@@ -588,6 +700,49 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     return Container();
   }
 
+  // TimeDesk Host: the help card as one slim row instead of a big block.
+  Widget _hostBanner(
+      String content, String btnText, GestureTapCallback onPressed) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final accent = dark ? MyTheme.accentDark : MyTheme.accent;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: dark ? MyTheme.macGroupDark : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+            color: dark ? MyTheme.macSeparatorDark : const Color(0xFFE3E3E8),
+            width: 0.5),
+      ),
+      child: Row(children: [
+        Icon(Icons.shield_outlined, color: accent, size: 18),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            translate(content),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: _macCaption(context).copyWith(fontSize: 11.5, height: 1.3),
+          ),
+        ),
+        if (btnText.isNotEmpty) ...[
+          const SizedBox(width: 8),
+          OutlinedButton(
+            onPressed: onPressed,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: accent,
+              side: BorderSide(color: accent),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              minimumSize: const Size(0, 30),
+            ),
+            child: Text(translate(btnText)),
+          ),
+        ],
+      ]),
+    );
+  }
+
   Widget buildInstallCard(String title, String content, String btnText,
       GestureTapCallback onPressed,
       {double marginTop = 20.0,
@@ -598,6 +753,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     if (bind.mainGetBuildinOption(key: kOptionHideHelpCards) == 'Y' &&
         content != 'install_daemon_tip') {
       return const SizedBox();
+    }
+    if (bind.isIncomingOnly()) {
+      return _hostBanner(content, btnText, onPressed);
     }
     void closeCard() async {
       if (closeOption != null) {
@@ -714,6 +872,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     super.initState();
     _updateTimer = periodic_immediate(const Duration(seconds: 1), () async {
       await gFFI.serverModel.fetchID();
+      if (bind.isIncomingOnly()) {
+        _permanentPasswordSet.value =
+            (await bind.mainGetCommon(key: "permanent-password-set")) == "true";
+      }
       final error = await bind.mainGetError();
       if (systemError != error) {
         systemError = error;
@@ -876,8 +1038,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     }
     if (renderObject is RenderBox) {
       final size = renderObject.size;
-      if (size != imcomingOnlyHomeSize) {
-        imcomingOnlyHomeSize = size;
+      // Width stays fixed: the pane fills the window, so only height follows content.
+      if (size.height != imcomingOnlyHomeSize.height) {
+        imcomingOnlyHomeSize = Size(imcomingOnlyHomeSize.width, size.height);
         windowManager.setSize(getIncomingOnlyHomeSize());
       }
     }
