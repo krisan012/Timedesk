@@ -477,6 +477,14 @@ jobs:
           popd
           mkdir -p ./SignOutput
           mv ./target/release/rustdesk-portable-packer.exe ./SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
+          # TimeDesk Host: the same build plus the marker that turns on Host mode (src/common.rs TIMEDESK_HOST_MARKER).
+          # Removed again so the MSI below stays the normal app.
+          touch ./rustdesk/timedesk-host
+          pushd ./libs/portable
+          python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/timedesk.exe
+          popd
+          rm ./rustdesk/timedesk-host
+          mv ./target/release/rustdesk-portable-packer.exe ./SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}-host.exe
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
