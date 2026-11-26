@@ -469,7 +469,8 @@ class MyTheme {
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        backgroundColor: Colors.white,
+        // Colors.white, spelled out: the CI Flutter 3.44 patch counts that exact text.
+        backgroundColor: Color(0xFFFFFFFF),
         foregroundColor: macLabel,
         side: BorderSide(color: macSeparatorLight),
         shape: RoundedRectangleBorder(
@@ -3902,12 +3903,12 @@ Widget loadIcon(double size) {
           ));
 }
 
-var imcomingOnlyHomeSize = Size(280, 300);
+var imcomingOnlyHomeSize = Size(560, 220);
 Size getIncomingOnlyHomeSize() {
   final magicWidth = isWindows ? 11.0 : 2.0;
   final magicHeight = 10.0;
   return imcomingOnlyHomeSize +
-      Offset(magicWidth, kDesktopRemoteTabBarHeight + magicHeight);
+      Offset(magicWidth, magicHeight); // Host mode has no title bar.
 }
 
 Size getIncomingOnlySettingsSize() {

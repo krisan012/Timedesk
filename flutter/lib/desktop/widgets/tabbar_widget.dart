@@ -523,6 +523,9 @@ class _DesktopTabState extends State<DesktopTab>
 
   @override
   Widget build(BuildContext context) {
+    if (bind.isIncomingOnly() && tabType == DesktopTabType.main) {
+      return _buildHostHome();
+    }
     return Column(children: [
       Obx(() {
         if (stateGlobal.showTabBar.isTrue &&
@@ -552,6 +555,36 @@ class _DesktopTabState extends State<DesktopTab>
           child: pageViewBuilder != null
               ? pageViewBuilder!(_buildPageView())
               : _buildPageView())
+    ]);
+  }
+
+  // TimeDesk Host: no title bar. The page fills the window, any empty spot
+  // drags it, and minimize/close float in the top-right corner.
+  Widget _buildHostHome() {
+    return Stack(children: [
+      Positioned.fill(
+        child: GestureDetector(
+          onPanStart: (_) => startDragging(isMainWindow),
+          child: _buildPageView(),
+        ),
+      ),
+      Positioned(
+        top: 0,
+        right: 0,
+        height: _kTabBarHeight,
+        child: WindowActionPanel(
+          isMainWindow: isMainWindow,
+          state: state,
+          tabController: controller,
+          invisibleTabKeys: invisibleTabKeys,
+          tail: tail,
+          showMinimize: showMinimize,
+          showMaximize: false,
+          showClose: showClose,
+          onClose: onWindowCloseButton,
+          labelGetter: labelGetter,
+        ),
+      ),
     ]);
   }
 
@@ -779,16 +812,39 @@ class WindowActionPanelState extends State<WindowActionPanel> {
           }
         }),
         if (widget.tail != null) widget.tail!,
-        if (!kUseCompatibleUiMode && !isMacOS)
-          // macOS-style "traffic light" window controls on Windows/Linux.
-          // On macOS the native buttons are used instead.
+        if (!kUseCompatibleUiMode)
           Row(
             children: [
-              if (widget.showClose)
-                MacWindowDot(
+              if (widget.showMinimize && !isMacOS)
+                ActionIcon(
+                  message: 'Minimize',
+                  icon: IconFont.min,
+                  onTap: () {
+                    if (widget.isMainWindow) {
+                      windowManager.minimize();
+                    } else {
+                      WindowController.fromWindowId(kWindowId!).minimize();
+                    }
+                  },
+                  isClose: false,
+                ),
+              if (widget.showMaximize && !isMacOS)
+                Obx(() => ActionIcon(
+                      message: stateGlobal.isMaximized.isTrue
+                          ? 'Restore'
+                          : 'Maximize',
+                      icon: stateGlobal.isMaximized.isTrue
+                          ? IconFont.restore
+                          : IconFont.max,
+                      onTap: bind.isIncomingOnly() && isInHomePage()
+                          ? null
+                          : _toggleMaximize,
+                      isClose: false,
+                    )),
+              if (widget.showClose && !isMacOS)
+                ActionIcon(
                   message: 'Close',
-                  color: const Color(0xFFFF5F57),
-                  glyph: Icons.close,
+                  icon: IconFont.close,
                   onTap: () async {
                     final res = await widget.onClose?.call() ?? true;
                     if (res) {
@@ -804,34 +860,8 @@ class WindowActionPanelState extends State<WindowActionPanel> {
                       });
                     }
                   },
-                ),
-              if (widget.showMinimize)
-                MacWindowDot(
-                  message: 'Minimize',
-                  color: const Color(0xFFFEBC2E),
-                  glyph: Icons.remove,
-                  onTap: () {
-                    if (widget.isMainWindow) {
-                      windowManager.minimize();
-                    } else {
-                      WindowController.fromWindowId(kWindowId!).minimize();
-                    }
-                  },
-                ),
-              if (widget.showMaximize)
-                Obx(() => MacWindowDot(
-                      message: stateGlobal.isMaximized.isTrue
-                          ? 'Restore'
-                          : 'Maximize',
-                      color: const Color(0xFF28C840),
-                      glyph: stateGlobal.isMaximized.isTrue
-                          ? Icons.close_fullscreen
-                          : Icons.open_in_full,
-                      onTap: bind.isIncomingOnly() && isInHomePage()
-                          ? null
-                          : _toggleMaximize,
-                    )),
-              const SizedBox(width: 10),
+                  isClose: true,
+                )
             ],
           ),
       ],
@@ -1261,57 +1291,6 @@ class _CloseButton extends StatelessWidget {
               }
             }())
         .paddingOnly(left: 10);
-  }
-}
-
-/// A macOS-style round window control ("traffic light").
-class MacWindowDot extends StatelessWidget {
-  final String message;
-  final Color color;
-  final IconData glyph;
-  final GestureTapCallback? onTap;
-
-  const MacWindowDot(
-      {Key? key,
-      required this.message,
-      required this.color,
-      required this.glyph,
-      this.onTap})
-      : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final hover = false.obs;
-    final enabled = onTap != null;
-    return Tooltip(
-      message: translate(message),
-      waitDuration: const Duration(seconds: 1),
-      child: MouseRegion(
-        onEnter: (_) => hover.value = true,
-        onExit: (_) => hover.value = false,
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            width: 20,
-            height: _kTabBarHeight - 1,
-            alignment: Alignment.center,
-            child: Obx(() => Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: enabled ? color : const Color(0xFFCDCDD1),
-                    border: Border.all(
-                        color: Colors.black.withOpacity(0.12), width: 0.5),
-                  ),
-                  child: hover.value && enabled
-                      ? Icon(glyph, size: 8, color: Colors.black54)
-                      : null,
-                )),
-          ),
-        ),
-      ),
-    );
   }
 }
 

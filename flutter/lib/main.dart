@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common/widgets/overlay.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
+import 'package:flutter_hbb/desktop/pages/host_password_page.dart';
 import 'package:flutter_hbb/desktop/pages/install_page.dart';
 import 'package:flutter_hbb/desktop/pages/server_page.dart';
 import 'package:flutter_hbb/desktop/screen/desktop_file_transfer_screen.dart';
@@ -106,6 +107,8 @@ Future<void> main(List<String> args) async {
     runConnectionManagerScreen();
   } else if (args.contains('--install')) {
     runInstallPage();
+  } else if (args.contains(kHostPasswordArg)) {
+    runHostPasswordPage();
   } else {
     desktopType = DesktopType.main;
     await windowManager.ensureInitialized();
@@ -395,6 +398,22 @@ void runInstallPage() async {
     windowManager.focus();
     windowManager.setOpacity(1);
     windowManager.setAlignment(Alignment.center); // ensure
+  });
+}
+
+// TimeDesk Host's "Set password" window, its own process like the install page.
+void runHostPasswordPage() async {
+  await windowManager.ensureInitialized();
+  await initEnv(kAppTypeMain);
+  _runApp(translate('Set Password'), const HostPasswordPage(),
+      MyTheme.currentThemeMode());
+  windowManager.waitUntilReadyToShow(
+      getHiddenTitleBarWindowOptions(size: kHostPasswordSize, center: true),
+      () async {
+    windowManager.setResizable(false);
+    windowManager.show();
+    windowManager.focus();
+    windowManager.setOpacity(1);
   });
 }
 
