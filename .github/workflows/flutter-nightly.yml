@@ -1,10 +1,20 @@
 name: Flutter Nightly Build
 
 on:
-  schedule:
-    # schedule build every night
-    - cron: "0 0 * * *"
+  # TimeDesk: build on every merge into master instead of every night.
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - ".github/**"
+      - "docs/**"
+      - "README.md"
   workflow_dispatch:
+
+# Merges close together all upload to the same "nightly" release; only the newest build is kept.
+concurrency:
+  group: flutter-nightly
+  cancel-in-progress: true
 
 jobs:
   run-flutter-nightly-build:
