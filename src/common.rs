@@ -2571,6 +2571,7 @@ pub fn load_custom_client() {
     else {
         return;
     };
+    init_timedesk_host_mode(&path);
     #[cfg(target_os = "macos")]
     let path = path.join("../Resources");
     let path = path.join("custom.txt");
@@ -2580,6 +2581,19 @@ pub fn load_custom_client() {
             return;
         };
         read_custom_client(&data.trim());
+    }
+}
+
+/// The TimeDesk Host installer ships this file next to the program. Installing and updating copy the whole program
+/// folder, so the installed app keeps it, and with it incoming-only mode.
+pub const TIMEDESK_HOST_MARKER: &str = "timedesk-host";
+
+fn init_timedesk_host_mode(dir: &std::path::Path) {
+    if dir.join(TIMEDESK_HOST_MARKER).is_file() {
+        config::HARD_SETTINGS
+            .write()
+            .unwrap()
+            .insert("conn-type".to_owned(), "incoming".to_owned());
     }
 }
 
@@ -3170,6 +3184,20 @@ mod tests {
             format!("{BRAND_RENDEZVOUS_SERVER}:{RENDEZVOUS_PORT}")
         );
         assert_eq!(Config::get_option(keys::OPTION_KEY), BRAND_RS_PUB_KEY);
+    }
+
+    #[test]
+    fn host_marker_next_to_the_program_turns_on_host_mode() {
+        let dir = std::env::temp_dir().join(format!("timedesk-host-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        init_timedesk_host_mode(&dir);
+        assert!(!config::is_incoming_only());
+        std::fs::write(dir.join(TIMEDESK_HOST_MARKER), "").unwrap();
+        init_timedesk_host_mode(&dir);
+        let host = config::is_incoming_only();
+        config::HARD_SETTINGS.write().unwrap().remove("conn-type");
+        std::fs::remove_dir_all(&dir).ok();
+        assert!(host);
     }
 
     #[test]
