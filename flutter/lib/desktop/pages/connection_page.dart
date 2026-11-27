@@ -5,7 +5,6 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_hbb/common/widgets/connection_page_title.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/widgets/popup_menu.dart';
 import 'package:flutter_hbb/models/state_model.dart';
@@ -16,9 +15,10 @@ import 'package:flutter_hbb/models/peer_model.dart';
 
 import '../../common.dart';
 import '../../common/formatter/id_formatter.dart';
-import '../../common/widgets/peer_tab_page.dart';
 import '../../common/widgets/autocomplete.dart';
 import '../../models/platform_model.dart';
+import '../../common/widgets/peer_card.dart';
+import '../widgets/recent_devices.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
 
 class OnlineStatusWidget extends StatefulWidget {
@@ -189,7 +189,9 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
 
 /// Connection page for connecting to a remote peer.
 class ConnectionPage extends StatefulWidget {
-  const ConnectionPage({Key? key}) : super(key: key);
+  const ConnectionPage({Key? key, this.onSeeAll}) : super(key: key);
+
+  final VoidCallback? onSeeAll;
 
   @override
   State<ConnectionPage> createState() => _ConnectionPageState();
@@ -309,16 +311,14 @@ class _ConnectionPageState extends State<ConnectionPage>
         Expanded(
             child: Column(
           children: [
-            Row(
-              children: [
-                Flexible(child: _buildRemoteIDTextField(context)),
-              ],
-            ),
-            Expanded(child: PeerTabPage().paddingOnly(left: 12)),
+            _buildRemoteIDTextField(context),
+            Expanded(
+                child: RecentDevices(onSeeAll: widget.onSeeAll)
+                    .paddingOnly(left: 12, right: 24, top: 4)),
           ],
         ).paddingOnly(left: 12.0)),
-        if (!isOutgoingOnly) const Divider(height: 1),
-        if (!isOutgoingOnly) OnlineStatusWidget()
+        // Hidden: the header pill shows the status, this keeps it polled.
+        if (!isOutgoingOnly) Offstage(child: OnlineStatusWidget())
       ],
     );
   }
@@ -374,13 +374,32 @@ class _ConnectionPageState extends State<ConnectionPage>
   /// UI for the remote ID TextField.
   /// Search for a peer.
   Widget _buildRemoteIDTextField(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     var w = Container(
-      padding: const EdgeInsets.fromLTRB(12, 22, 22, 16),
+      margin: const EdgeInsets.fromLTRB(12, 12, 24, 12),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      decoration: BoxDecoration(
+        color: dark ? MyTheme.macGroupDark : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(dark ? 0.45 : 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Ink(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            getConnectionPageTitle(context, false).marginOnly(bottom: 14),
+            Text(translate('Connect to another device').toUpperCase(),
+                    style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.9,
+                        color: Theme.of(context).hintColor))
+                .marginOnly(bottom: 10),
             Row(
               children: [
                 Expanded(
@@ -447,8 +466,8 @@ class _ConnectionPageState extends State<ConnectionPage>
                           enableSuggestions: false,
                           keyboardType: TextInputType.visiblePassword,
                           focusNode: fieldFocusNode,
-                          style: const TextStyle(
-                            fontSize: 17,
+                          style: kTimedeskMono.copyWith(
+                            fontSize: 15,
                             height: 1.3,
                             letterSpacing: 0.3,
                           ),
@@ -459,21 +478,21 @@ class _ConnectionPageState extends State<ConnectionPage>
                               counterText: '',
                               hintText: _idInputFocused.value
                                   ? null
-                                  : translate('Enter Remote ID'),
-                              prefixIcon: Icon(Icons.desktop_windows_outlined,
-                                  size: 18,
+                                  : translate('Partner address'),
+                              hintStyle: kTimedeskMono.copyWith(
+                                  fontSize: 14,
                                   color: Theme.of(context).hintColor),
-                              prefixIconConstraints: const BoxConstraints(
-                                  minWidth: 38, minHeight: 20),
+                              filled: true,
+                              fillColor: dark
+                                  ? const Color(0xFF2B3036)
+                                  : const Color(0xFFE9EBED),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(
-                                    color: Theme.of(context).dividerColor),
+                                borderSide: BorderSide.none,
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(
-                                    color: Theme.of(context).dividerColor),
+                                borderSide: BorderSide.none,
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
@@ -485,7 +504,7 @@ class _ConnectionPageState extends State<ConnectionPage>
                                     width: 2.5),
                               ),
                               contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 4, vertical: 10)),
+                                  horizontal: 12, vertical: 11)),
                           controller: fieldTextEditingController,
                           inputFormatters: [IDTextInputFormatter()],
                           onChanged: (v) {
@@ -578,7 +597,25 @@ class _ConnectionPageState extends State<ConnectionPage>
                     onPressed: () {
                       onConnect();
                     },
-                    child: Text(translate("Connect")),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.north_east_rounded, size: 15),
+                      const SizedBox(width: 6),
+                      Text(translate("Connect")),
+                    ]),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                SizedBox(
+                  height: 38.0,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () => onConnect(isFileTransfer: true),
+                    icon: const Icon(Icons.swap_horiz_rounded, size: 16),
+                    label: Text(translate('Send files')),
                   ),
                 ),
                 const SizedBox(width: 6),
@@ -680,7 +717,6 @@ class _ConnectionPageState extends State<ConnectionPage>
         ),
       ),
     );
-    return Container(
-        constraints: const BoxConstraints(maxWidth: 620), child: w);
+    return w;
   }
 }

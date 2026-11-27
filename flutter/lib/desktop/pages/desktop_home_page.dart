@@ -8,11 +8,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/widgets/animated_rotation_widget.dart';
 import 'package:flutter_hbb/common/widgets/custom_password.dart';
+import 'package:flutter_hbb/common/widgets/peer_tab_page.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/connection_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/desktop/pages/host_password_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
+import 'package:flutter_hbb/desktop/widgets/theme_fade.dart';
 import 'package:flutter_hbb/desktop/widgets/update_progress.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/server_model.dart';
@@ -24,7 +26,6 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:window_size/window_size.dart' as window_size;
-import '../widgets/button.dart';
 
 class DesktopHomePage extends StatefulWidget {
   const DesktopHomePage({Key? key}) : super(key: key);
@@ -59,11 +60,17 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   final GlobalKey _childKey = GlobalKey();
   final _permanentPasswordSet = false.obs;
   final _showPermanentPassword = false.obs;
+  // TimeDesk Host: the permanent password card turns into the Set password
+  // form in place; a separate window took seconds to start.
+  final _editingPassword = false.obs;
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final isIncomingOnly = bind.isIncomingOnly();
+    if (!isIncomingOnly) {
+      return _buildBlock(child: _buildTimedeskHome(context));
+    }
     return _buildBlock(
         child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,24 +92,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   Widget buildLeftPane(BuildContext context) {
     final isIncomingOnly = bind.isIncomingOnly();
     final isOutgoingOnly = bind.isOutgoingOnly();
-    final helpCards = FutureBuilder<Widget>(
-      future:
-          Future.value(Obx(() => buildHelpCards(stateGlobal.updateUrl.value))),
-      builder: (_, data) {
-        if (data.hasData) {
-          if (isIncomingOnly) {
-            if (isInHomePage()) {
-              Future.delayed(Duration(milliseconds: 300), () {
-                _updateWindowSize();
-              });
-            }
-          }
-          return data.data!;
-        } else {
-          return const Offstage();
-        }
-      },
-    );
+    // Built directly: a FutureBuilder with a new future each build drew no
+    // card for one frame, which made the Host window shrink and regrow.
+    final helpCards = Obx(() => buildHelpCards(stateGlobal.updateUrl.value));
     final children = isIncomingOnly
         ? _incomingOnlyChildren(context, helpCards)
         : <Widget>[
@@ -126,20 +118,22 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       value: gFFI.serverModel,
       child: Container(
         width: isIncomingOnly ? null : 236.0,
-        color: Theme.of(context).colorScheme.background,
+        color: isIncomingOnly
+            ? (Theme.of(context).brightness == Brightness.dark
+                ? MyTheme.macWindowDark
+                : MyTheme.grayBg)
+            : Theme.of(context).colorScheme.background,
         child: Stack(
           children: [
-            Column(
-              children: [
-                SingleChildScrollView(
-                  controller: _leftPaneScrollController,
-                  child: Column(
-                    key: _childKey,
-                    children: children,
-                  ),
-                ),
-                Expanded(child: Container())
-              ],
+            // Bounded and not user-scrollable: while the Host window catches up
+            // with taller content, the bottom is clipped instead of overflowing.
+            SingleChildScrollView(
+              controller: _leftPaneScrollController,
+              physics: const NeverScrollableScrollPhysics(),
+              child: Column(
+                key: _childKey,
+                children: children,
+              ),
             ),
             if (isOutgoingOnly)
               Positioned(
@@ -174,64 +168,124 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     );
   }
 
-  // TimeDesk Host: a wide window, logo and tip on the left, ID/password on
-  // the right, online status across the bottom.
+  // TimeDesk Host: the client's look in a fixed-width window. Logo and status
+  // on top, the address card, the permanent password card when shown, notices.
   List<Widget> _incomingOnlyChildren(BuildContext context, Widget helpCards) {
+    _fitHostWindowAfterFrame();
     return [
-      buildPresetPasswordWarning(),
-      // No IntrinsicHeight: the ID board uses a LayoutBuilder, which cannot
-      // report intrinsic sizes.
+      _presetPasswordWarning,
       Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
             width: 200,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                loadLogo(),
-                _buildTipText(context),
-              ],
-            ),
+            height: 48,
+            child: Align(alignment: Alignment.centerLeft, child: loadLogo()),
           ),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                buildTip(context),
-                _macGroup(context, [
-                  buildIDBoard(context),
-                  _macSeparator(context),
-                  buildPasswordBoard(context),
-                  Obx(() => _showPermanentPassword.value
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _macSeparator(context),
-                            _buildPermanentPasswordRow(context),
-                          ],
-                        )
-                      : const SizedBox.shrink()),
-                ]),
-                _buildPermanentPasswordToggle(context)
-                    .marginOnly(bottom: 12),
-              ],
-            ),
+          const Spacer(),
+          _buildHostThemeButton(context),
+          const SizedBox(width: 8),
+          _buildStatusPill(context),
+        ],
+      ).paddingOnly(left: 12, right: 24, top: 8, bottom: 14),
+      _buildAddressCard(context),
+      Obx(() {
+        _fitHostWindowAfterFrame();
+        if (!_showPermanentPassword.value) return const SizedBox.shrink();
+        return _hostCard(
+            context,
+            _editingPassword.value
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(translate('Set permanent password').toUpperCase(),
+                          style: _macCaption(context).copyWith(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.9)),
+                      const SizedBox(height: 10),
+                      HostPasswordForm(
+                          onDone: () => _editingPassword.value = false),
+                    ],
+                  ).paddingOnly(left: 12, top: 10, right: 12, bottom: 10)
+                : _buildPermanentPasswordRow(context));
+      }),
+      _buildPermanentPasswordToggle(context),
+      helpCards.paddingSymmetric(horizontal: 10),
+      // Hidden: the pill shows the status, this keeps it polled.
+      Offstage(
+        child: OnlineStatusWidget(
+          onSvcStatusChanged: () {
+            if (isInHomePage()) {
+              Future.delayed(Duration(milliseconds: 300), () {
+                _updateWindowSize();
+              });
+            }
+          },
+        ),
+      ),
+      const SizedBox(height: 8),
+    ];
+  }
+
+  // Fit the window to the content after a build, not only after the timed
+  // calls elsewhere, which can miss a change and clip the bottom card.
+  void _fitHostWindowAfterFrame() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && isInHomePage()) _updateWindowSize();
+    });
+  }
+
+  // TimeDesk Host has no Settings window: the theme cycles from the header,
+  // Light -> Dark -> System like the client's nav rail.
+  Widget _buildHostThemeButton(BuildContext context) {
+    return Obx(() {
+      final mode = _themeMode.value;
+      final next = mode == ThemeMode.light
+          ? ThemeMode.dark
+          : mode == ThemeMode.dark
+              ? ThemeMode.system
+              : ThemeMode.light;
+      return KeyedSubtree(
+        key: _themeToggleKey,
+        child: _boxIconButton(context,
+            icon: mode == ThemeMode.light
+                ? Icons.light_mode_outlined
+                : mode == ThemeMode.dark
+                    ? Icons.dark_mode_outlined
+                    : Icons.brightness_auto_outlined,
+            tooltip: mode == ThemeMode.light
+                ? 'Light'
+                : mode == ThemeMode.dark
+                    ? 'Dark'
+                    : 'Follow System', onTap: () async {
+          _themeMode.value = next;
+          final box =
+              _themeToggleKey.currentContext?.findRenderObject() as RenderBox?;
+          await changeThemeWithFade(() => MyTheme.changeDarkMode(next),
+              origin: box?.localToGlobal(box.size.center(Offset.zero)));
+        }),
+      );
+    });
+  }
+
+  Widget _hostCard(BuildContext context, Widget child) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+      padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
+      decoration: BoxDecoration(
+        color: dark ? MyTheme.macGroupDark : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(dark ? 0.45 : 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 4),
           ),
         ],
-      ).marginOnly(top: 20),
-      helpCards,
-      const Divider(height: 1),
-      OnlineStatusWidget(
-        onSvcStatusChanged: () {
-          if (isInHomePage()) {
-            Future.delayed(Duration(milliseconds: 300), () {
-              _updateWindowSize();
-            });
-          }
-        },
-      ).marginOnly(bottom: 6, right: 6),
-    ];
+      ),
+      child: child,
+    );
   }
 
   buildRightPane(BuildContext context) {
@@ -462,16 +516,19 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             children: [
               Expanded(
                 child: AutoSizeText(
-                  translate("Permanent Password"),
-                  style: _macCaption(context),
+                  translate("Permanent Password").toUpperCase(),
+                  style: _macCaption(context).copyWith(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.9),
                   maxLines: 1,
                 ),
               ),
               if (!bind.isDisableSettings())
-                _macIconButton(context,
+                _boxIconButton(context,
                     icon: Icons.edit_outlined,
                     tooltip: 'Set permanent password',
-                    onTap: openHostPasswordWindow),
+                    onTap: () => _editingPassword.value = true),
             ],
           ),
           Obx(() => Text(
@@ -504,7 +561,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                   .copyWith(fontSize: 11, fontWeight: FontWeight.w400),
             ).paddingSymmetric(horizontal: 4, vertical: 2)),
       ),
-    ).marginOnly(top: 4, right: 14);
+    ).marginOnly(top: 6, right: 24, bottom: 4);
   }
 
   buildTip(BuildContext context) {
@@ -710,7 +767,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
 
   // TimeDesk Host: the help card as one slim row instead of a big block.
   Widget _hostBanner(
-      String content, String btnText, GestureTapCallback onPressed) {
+      String content, String btnText, GestureTapCallback onPressed,
+      {VoidCallback? onClose}) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final accent = dark ? MyTheme.accentDark : MyTheme.accent;
     return Container(
@@ -719,9 +777,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       decoration: BoxDecoration(
         color: dark ? MyTheme.macGroupDark : Colors.white,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-            color: dark ? MyTheme.macSeparatorDark : const Color(0xFFE3E3E8),
-            width: 0.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(dark ? 0.45 : 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(children: [
         Icon(Icons.shield_outlined, color: accent, size: 18),
@@ -729,24 +791,35 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         Expanded(
           child: Text(
             translate(content),
-            maxLines: 2,
+            maxLines: 3,
             overflow: TextOverflow.ellipsis,
             style: _macCaption(context).copyWith(fontSize: 11.5, height: 1.3),
           ),
         ),
         if (btnText.isNotEmpty) ...[
           const SizedBox(width: 8),
-          OutlinedButton(
+          ElevatedButton(
             onPressed: onPressed,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: accent,
-              side: BorderSide(color: accent),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accent,
+              foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 14),
               minimumSize: const Size(0, 30),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              textStyle:
+                  const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6)),
             ),
             child: Text(translate(btnText)),
           ),
         ],
+        if (onClose != null)
+          IconButton(
+            icon: const Icon(Icons.close, size: 16),
+            splashRadius: 14,
+            onPressed: onClose,
+          ),
       ]),
     );
   }
@@ -761,9 +834,6 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     if (bind.mainGetBuildinOption(key: kOptionHideHelpCards) == 'Y' &&
         content != 'install_daemon_tip') {
       return const SizedBox();
-    }
-    if (bind.isIncomingOnly()) {
-      return _hostBanner(content, btnText, onPressed);
     }
     void closeCard() async {
       if (closeOption != null) {
@@ -780,99 +850,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       }
     }
 
-    return Stack(
-      children: [
-        Container(
-          margin: EdgeInsets.fromLTRB(
-              0, marginTop, 0, bind.isIncomingOnly() ? marginTop : 0),
-          child: Container(
-              decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  Color.fromARGB(255, 226, 66, 188),
-                  Color.fromARGB(255, 244, 114, 124),
-                ],
-              )),
-              padding: EdgeInsets.all(20),
-              child: Column(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: (title.isNotEmpty
-                          ? <Widget>[
-                              Center(
-                                  child: Text(
-                                translate(title),
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15),
-                              ).marginOnly(bottom: 6)),
-                            ]
-                          : <Widget>[]) +
-                      <Widget>[
-                        if (content.isNotEmpty)
-                          Text(
-                            translate(content),
-                            style: TextStyle(
-                                height: 1.5,
-                                color: Colors.white,
-                                fontWeight: FontWeight.normal,
-                                fontSize: 13),
-                          ).marginOnly(bottom: 20)
-                      ] +
-                      (btnText.isNotEmpty
-                          ? <Widget>[
-                              Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    FixedWidthButton(
-                                      width: 150,
-                                      padding: 8,
-                                      isOutline: true,
-                                      text: translate(btnText),
-                                      textColor: Colors.white,
-                                      borderColor: Colors.white,
-                                      textSize: 20,
-                                      radius: 10,
-                                      onTap: onPressed,
-                                    )
-                                  ])
-                            ]
-                          : <Widget>[]) +
-                      (help != null
-                          ? <Widget>[
-                              Center(
-                                  child: InkWell(
-                                      onTap: () async =>
-                                          await launchUrl(Uri.parse(link!)),
-                                      child: Text(
-                                        translate(help),
-                                        style: TextStyle(
-                                            decoration:
-                                                TextDecoration.underline,
-                                            color: Colors.white,
-                                            fontSize: 12),
-                                      )).marginOnly(top: 6)),
-                            ]
-                          : <Widget>[]))),
-        ),
-        if (closeButton != null && closeButton == true)
-          Positioned(
-            top: 18,
-            right: 0,
-            child: IconButton(
-              icon: Icon(
-                Icons.close,
-                color: Colors.white,
-                size: 20,
-              ),
-              onPressed: closeCard,
-            ),
-          ),
-      ],
-    );
+    return _hostBanner(content, btnText, onPressed,
+        onClose: closeButton == true ? closeCard : null);
   }
 
   @override
@@ -888,6 +867,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           timedeskNotice = notice;
           setState(() {});
         }
+        // Retry a resize Windows ignored, e.g. one sent while a click on the
+        // page was being handled as a window drag.
+        if (mounted && isInHomePage()) await _updateWindowSize();
       }
       final error = await bind.mainGetError();
       if (systemError != error) {
@@ -1044,7 +1026,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     WidgetsBinding.instance.addObserver(this);
   }
 
-  _updateWindowSize() {
+  _updateWindowSize() async {
     RenderObject? renderObject = _childKey.currentContext?.findRenderObject();
     if (renderObject == null) {
       return;
@@ -1052,9 +1034,14 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     if (renderObject is RenderBox) {
       final size = renderObject.size;
       // Width stays fixed: the pane fills the window, so only height follows content.
-      if (size.height != imcomingOnlyHomeSize.height) {
-        imcomingOnlyHomeSize = Size(imcomingOnlyHomeSize.width, size.height);
-        windowManager.setSize(getIncomingOnlyHomeSize());
+      imcomingOnlyHomeSize = Size(imcomingOnlyHomeSize.width, size.height);
+      // Compare with the real window, not the last size asked for: a resize
+      // that did not take effect would otherwise never be retried.
+      final want = getIncomingOnlyHomeSize();
+      final have = await windowManager.getSize();
+      if ((have.height - want.height).abs() > 1 ||
+          (have.width - want.width).abs() > 1) {
+        await windowManager.setSize(want);
       }
     }
   }
@@ -1074,6 +1061,424 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     if (state == AppLifecycleState.resumed) {
       shouldBeBlocked(_block, canBeBlocked);
     }
+  }
+
+  // TimeDesk client: nav rail on the left, Connect or Devices on the right.
+  final _navIndex = 0.obs;
+  // TimeDesk Host: the one-time code starts hidden; clicking it shows or
+  // hides it. The client always shows it.
+  final _codeRevealed = (!bind.isIncomingOnly()).obs;
+  // Built once: it starts a new check, with a spinner, each time it is built.
+  late final Widget _presetPasswordWarning = buildPresetPasswordWarning();
+  final _themeMode = MyTheme.getThemeModePreference().obs;
+  final _themeToggleKey = GlobalKey();
+
+  // Light -> Dark -> System, the same three choices as Settings > Theme.
+  Widget _buildThemeToggle(
+      Widget Function(IconData, String, VoidCallback) item) {
+    return Obx(() {
+      final mode = _themeMode.value;
+      final next = mode == ThemeMode.light
+          ? ThemeMode.dark
+          : mode == ThemeMode.dark
+              ? ThemeMode.system
+              : ThemeMode.light;
+      return Tooltip(
+        key: _themeToggleKey,
+        message: translate(mode == ThemeMode.light
+            ? 'Light'
+            : mode == ThemeMode.dark
+                ? 'Dark'
+                : 'Follow System'),
+        child: item(
+            mode == ThemeMode.light
+                ? Icons.light_mode_outlined
+                : mode == ThemeMode.dark
+                    ? Icons.dark_mode_outlined
+                    : Icons.brightness_auto_outlined,
+            mode == ThemeMode.light
+                ? 'Light'
+                : mode == ThemeMode.dark
+                    ? 'Dark'
+                    : 'System', () async {
+          _themeMode.value = next;
+          final box =
+              _themeToggleKey.currentContext?.findRenderObject() as RenderBox?;
+          await changeThemeWithFade(() => MyTheme.changeDarkMode(next),
+              origin: box?.localToGlobal(box.size.center(Offset.zero)));
+        }),
+      );
+    });
+  }
+
+  Widget _buildTimedeskHome(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildNavRail(context),
+        Expanded(
+          child: Container(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? MyTheme.macWindowDark
+                : MyTheme.grayBg,
+            // Wide screens: keep the layout centered instead of stretched.
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1100),
+                child: Obx(() => _navIndex.value == 0
+                    ? _buildConnectView(context)
+                    : Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 16, 12, 0),
+                        child: PeerTabPage(),
+                      )),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNavRail(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    Widget item(IconData icon, String label, VoidCallback onTap,
+        {int? index}) {
+      return Obx(() {
+        final selected = _navIndex.value == index;
+        return InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: Container(
+            width: 52,
+            padding: const EdgeInsets.symmetric(vertical: 7),
+            decoration: BoxDecoration(
+              color: selected
+                  ? (dark ? MyTheme.macGroupDark : Colors.white)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: selected && !dark
+                  ? [
+                      BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 3,
+                          offset: const Offset(0, 1))
+                    ]
+                  : null,
+            ),
+            child: Column(
+              children: [
+                Icon(icon,
+                    size: 18,
+                    color: selected
+                        ? Theme.of(context).colorScheme.primary
+                        : _macCaption(context).color),
+                const SizedBox(height: 3),
+                Text(translate(label),
+                    style: _macCaption(context).copyWith(
+                        fontSize: 10.5,
+                        color: selected
+                            ? Theme.of(context).textTheme.titleLarge?.color
+                            : null)),
+              ],
+            ),
+          ),
+        ).marginOnly(bottom: 6);
+      });
+    }
+
+    return Container(
+      width: 68,
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.background,
+        border: Border(
+            right: BorderSide(color: Theme.of(context).dividerColor, width: 0.5)),
+      ),
+      child: Column(
+        children: [
+          item(Icons.link_rounded, 'Connect', () => _navIndex.value = 0,
+              index: 0),
+          item(Icons.desktop_windows_outlined, 'Devices',
+              () => _navIndex.value = 1,
+              index: 1),
+          const Spacer(),
+          _buildThemeToggle((icon, label, onTap) => item(icon, label, onTap)),
+          if (!bind.isDisableSettings())
+            item(Icons.settings_outlined, 'Settings',
+                () => DesktopTabPage.onAddSetting()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConnectView(BuildContext context) {
+    final isOutgoingOnly = bind.isOutgoingOnly();
+    return ChangeNotifierProvider.value(
+      value: gFFI.serverModel,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Text(translate('Connect'),
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.w700)),
+              const Spacer(),
+              if (!isOutgoingOnly) _buildStatusPill(context),
+            ],
+          ).paddingOnly(left: 24, top: 20, right: 24, bottom: 12),
+          if (!isOutgoingOnly) _presetPasswordWarning,
+          if (!isOutgoingOnly) _buildAddressCard(context),
+          Expanded(
+              child: ConnectionPage(onSeeAll: () => _navIndex.value = 1)),
+          Obx(() => buildHelpCards(stateGlobal.updateUrl.value))
+              .paddingSymmetric(horizontal: 10),
+        ],
+      ),
+    );
+  }
+
+  Widget _boxIconButton(BuildContext context,
+      {required IconData icon,
+      required String tooltip,
+      required VoidCallback? onTap}) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Tooltip(
+      message: translate(tooltip),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: dark ? const Color(0xFF2B3036) : const Color(0xFFE9EBED),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 16, color: _macCaption(context).color),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusPill(BuildContext context) {
+    return Obx(() {
+      final status = stateGlobal.svcStatus.value;
+      final stopped = svcStopped.value;
+      final ready = !stopped && status == SvcStatus.ready;
+      final text = stopped
+          ? 'Service is not running'
+          : status == SvcStatus.connecting
+              ? 'connecting_status'
+              : ready
+                  ? 'Ready for connections'
+                  : 'not_ready_status';
+      final color = ready
+          ? Theme.of(context).colorScheme.primary
+          : status == SvcStatus.connecting
+              ? kColorWarn
+              : _macCaption(context).color!;
+      final pill = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+                width: 6,
+                height: 6,
+                decoration:
+                    BoxDecoration(color: color, shape: BoxShape.circle)),
+            const SizedBox(width: 6),
+            Text(translate(text),
+                style: TextStyle(
+                    fontSize: 11.5, fontWeight: FontWeight.w600, color: color)),
+          ],
+        ),
+      );
+      if (!stopped) return pill;
+      return Tooltip(
+        message: translate('Start service'),
+        child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => start_service(true),
+            child: pill),
+      );
+    });
+  }
+
+  Widget _buildAddressCard(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+    final caption = _macCaption(context);
+    final label = caption.copyWith(
+        fontSize: 10.5, fontWeight: FontWeight.w600, letterSpacing: 0.9);
+    const mono = TextStyle(
+        fontFamily: 'Cascadia Mono',
+        fontFamilyFallback: ['Consolas', 'Courier New'],
+        fontWeight: FontWeight.w500);
+
+    return Consumer<ServerModel>(builder: (context, model, _) {
+      final showOneTime = model.approveMode != 'click' &&
+          model.verificationMethod != kUsePermanentPassword;
+      return Container(
+        margin: const EdgeInsets.fromLTRB(24, 4, 24, 0),
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
+        decoration: BoxDecoration(
+          color: dark ? MyTheme.macGroupDark : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(dark ? 0.45 : 0.08),
+              blurRadius: 18,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(translate("This device's address").toUpperCase(),
+                        style: label),
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      Flexible(
+                        child: ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: model.serverId,
+                            builder: (_, v, __) => FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(v.text,
+                                    maxLines: 1,
+                                    style: mono.copyWith(
+                                        fontSize: 28, letterSpacing: 1.5)))),
+                      ),
+                      const SizedBox(width: 8),
+                      _boxIconButton(context,
+                          icon: Icons.copy_rounded,
+                          tooltip: 'Copy',
+                          onTap: () {
+                            Clipboard.setData(
+                                ClipboardData(text: model.serverId.text));
+                            showToast(translate("Copied"));
+                          }),
+                      if (!bind.isDisableSettings() &&
+                          !bind.isIncomingOnly()) ...[
+                        const SizedBox(width: 6),
+                        _boxIconButton(context,
+                            icon: Icons.more_horiz,
+                            tooltip: 'Settings',
+                            onTap: DesktopTabPage.onAddSetting),
+                      ],
+                    ]),
+                    const SizedBox(height: 4),
+                    Text(
+                        translate(
+                            'Share the address and the code to let someone in.'),
+                        style: caption.copyWith(fontWeight: FontWeight.w400)),
+                  ],
+                ),
+              ),
+              VerticalDivider(
+                  width: 32, color: Theme.of(context).dividerColor),
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(translate('One-time code').toUpperCase(),
+                        style: label),
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      Flexible(
+                        child: ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: model.serverPasswd,
+                            builder: (_, v, __) => Obx(() {
+                                  final hidden = showOneTime &&
+                                      !_codeRevealed.value;
+                                  final canToggle =
+                                      showOneTime && bind.isIncomingOnly();
+                                  return Tooltip(
+                                    message: canToggle
+                                        ? translate(hidden
+                                            ? 'Click to show'
+                                            : 'Click to hide')
+                                        : '',
+                                    child: MouseRegion(
+                                      cursor: canToggle
+                                          ? SystemMouseCursors.click
+                                          : MouseCursor.defer,
+                                      child: GestureDetector(
+                                        onTap: canToggle
+                                            ? _codeRevealed.toggle
+                                            : null,
+                                        child: FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            alignment: Alignment.centerLeft,
+                                            child: Text(
+                                                !showOneTime
+                                                    ? '-'
+                                                    : hidden
+                                                        ? '••••••'
+                                                        : v.text,
+                                                maxLines: 1,
+                                                style: mono.copyWith(
+                                                    fontSize: 20,
+                                                    letterSpacing:
+                                                        hidden ? 2 : null,
+                                                    color: hidden
+                                                        ? _macCaption(context)
+                                                            .color
+                                                        : dark
+                                                            ? const Color(
+                                                                0xFFF26A6E)
+                                                            : primary))),
+                                      ),
+                                    ),
+                                  );
+                                })),
+                      ),
+                      const SizedBox(width: 8),
+                      if (showOneTime)
+                        _boxIconButton(context,
+                            icon: Icons.copy_rounded,
+                            tooltip: 'Copy',
+                            onTap: () {
+                              Clipboard.setData(
+                                  ClipboardData(text: model.serverPasswd.text));
+                              showToast(translate("Copied"));
+                            }),
+                      if (showOneTime) const SizedBox(width: 6),
+                      if (showOneTime)
+                        _boxIconButton(context,
+                            icon: Icons.refresh_rounded,
+                            tooltip: 'Refresh Password',
+                            onTap: () => bind.mainUpdateTemporaryPassword()),
+                    ]),
+                    const SizedBox(height: 4),
+                    Obx(() => Text(
+                        translate(showOneTime && !_codeRevealed.value
+                            ? 'Click the code to show it.'
+                            : 'Changes after each session.'),
+                        style: caption.copyWith(fontWeight: FontWeight.w400))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    });
   }
 }
 
@@ -1313,4 +1718,40 @@ void setPasswordDialog({VoidCallback? notEmptyCallback}) async {
       onCancel: close,
     );
   });
+}
+
+// TimeDesk client: below this the Connect page starts to crop.
+const kTimedeskMinWindowSize = Size(820, 620);
+const kTimedeskDefaultWindowSize = Size(1000, 720);
+// Above this the window can stretch across two screens.
+const kTimedeskMaxWindowSize = Size(1400, 1000);
+
+/// First start opens at the default size, centered. Later starts keep the
+/// saved size, clamped between the minimum and the maximum.
+Future<void> fitTimedeskMainWindow(bool restored) async {
+  await windowManager.setMinimumSize(kTimedeskMinWindowSize);
+  await windowManager.setMaximumSize(kTimedeskMaxWindowSize);
+  // Also blocks Win+Up and snapping to the top edge.
+  await windowManager.setMaximizable(false);
+  windowManager.addListener(_UndoMaximize());
+  if (await windowManager.isMaximized()) await windowManager.unmaximize();
+  if (!restored) {
+    await windowManager.setSize(kTimedeskDefaultWindowSize);
+    await windowManager.center();
+    return;
+  }
+  final size = await windowManager.getSize();
+  final fitted = Size(
+      size.width.clamp(
+          kTimedeskMinWindowSize.width, kTimedeskMaxWindowSize.width),
+      size.height.clamp(
+          kTimedeskMinWindowSize.height, kTimedeskMaxWindowSize.height));
+  if (fitted != size) await windowManager.setSize(fitted);
+}
+
+// Windows can still maximize through other paths (for example a direct
+// SC_MAXIMIZE), which leaves a max-size window parked in a corner.
+class _UndoMaximize with WindowListener {
+  @override
+  void onWindowMaximize() => windowManager.unmaximize();
 }

@@ -148,7 +148,7 @@ class _PeerCardState extends State<_PeerCard>
       children: [
         Container(
             decoration: BoxDecoration(
-              color: str2color('${peer.id}${peer.platform}', 0x7f),
+              color: platformTileColor(peer.platform),
               borderRadius: isPortrait
                   ? BorderRadius.circular(_tileRadius)
                   : BorderRadius.only(
@@ -298,6 +298,20 @@ class _PeerCardState extends State<_PeerCard>
       child: Obx(
         () => Container(
           foregroundDecoration: deco.value,
+          // TimeDesk: same soft shadow as the home page cards.
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(_cardRadius - _borderWidth),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(
+                    Theme.of(context).brightness == Brightness.dark
+                        ? 0.45
+                        : 0.08),
+                blurRadius: 18,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(_cardRadius - _borderWidth),
             child: Column(
@@ -306,7 +320,7 @@ class _PeerCardState extends State<_PeerCard>
               children: [
                 Expanded(
                   child: Container(
-                    color: str2color('${peer.id}${peer.platform}', 0x7f),
+                    color: platformTileColor(peer.platform),
                     child: Row(
                       children: [
                         Expanded(
@@ -1607,3 +1621,18 @@ void connectInPeerTab(BuildContext context, Peer peer, PeerTabIndex tab,
       isTcpTunneling: isTcpTunneling,
       isRDP: isRDP);
 }
+
+// TimeDesk: one color per platform instead of one hashed from the peer ID.
+Color platformTileColor(String platform) {
+  switch (platform) {
+    case kPeerPlatformMacOS:
+    case kPeerPlatformLinux:
+      return const Color(0xFF343A40);
+    default:
+      return const Color(0xFF0078D4);
+  }
+}
+
+const kTimedeskMono = TextStyle(
+    fontFamily: 'Cascadia Mono',
+    fontFamilyFallback: ['Consolas', 'Courier New']);
