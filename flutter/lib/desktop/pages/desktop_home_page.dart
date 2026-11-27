@@ -60,6 +60,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   final GlobalKey _childKey = GlobalKey();
   final _permanentPasswordSet = false.obs;
   final _showPermanentPassword = false.obs;
+  // TimeDesk Host: the permanent password card turns into the Set password
+  // form in place; a separate window took seconds to start.
+  final _editingPassword = false.obs;
 
   @override
   Widget build(BuildContext context) {
@@ -187,9 +190,24 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       _buildAddressCard(context),
       Obx(() {
         _fitHostWindowAfterFrame();
-        return _showPermanentPassword.value
-            ? _hostCard(context, _buildPermanentPasswordRow(context))
-            : const SizedBox.shrink();
+        if (!_showPermanentPassword.value) return const SizedBox.shrink();
+        return _hostCard(
+            context,
+            _editingPassword.value
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(translate('Set permanent password').toUpperCase(),
+                          style: _macCaption(context).copyWith(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.9)),
+                      const SizedBox(height: 10),
+                      HostPasswordForm(
+                          onDone: () => _editingPassword.value = false),
+                    ],
+                  ).paddingOnly(left: 12, top: 10, right: 12, bottom: 10)
+                : _buildPermanentPasswordRow(context));
       }),
       _buildPermanentPasswordToggle(context),
       helpCards.paddingSymmetric(horizontal: 10),
@@ -510,7 +528,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 _boxIconButton(context,
                     icon: Icons.edit_outlined,
                     tooltip: 'Set permanent password',
-                    onTap: openHostPasswordWindow),
+                    onTap: () => _editingPassword.value = true),
             ],
           ),
           Obx(() => Text(
