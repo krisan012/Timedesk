@@ -179,6 +179,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             child: Align(alignment: Alignment.centerLeft, child: loadLogo()),
           ),
           const Spacer(),
+          _buildHostThemeButton(context),
+          const SizedBox(width: 8),
           _buildStatusPill(context),
         ],
       ).paddingOnly(left: 12, right: 24, top: 8, bottom: 14),
@@ -212,6 +214,39 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   void _fitHostWindowAfterFrame() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && isInHomePage()) _updateWindowSize();
+    });
+  }
+
+  // TimeDesk Host has no Settings window: the theme cycles from the header,
+  // Light -> Dark -> System like the client's nav rail.
+  Widget _buildHostThemeButton(BuildContext context) {
+    return Obx(() {
+      final mode = _themeMode.value;
+      final next = mode == ThemeMode.light
+          ? ThemeMode.dark
+          : mode == ThemeMode.dark
+              ? ThemeMode.system
+              : ThemeMode.light;
+      return KeyedSubtree(
+        key: _themeToggleKey,
+        child: _boxIconButton(context,
+            icon: mode == ThemeMode.light
+                ? Icons.light_mode_outlined
+                : mode == ThemeMode.dark
+                    ? Icons.dark_mode_outlined
+                    : Icons.brightness_auto_outlined,
+            tooltip: mode == ThemeMode.light
+                ? 'Light'
+                : mode == ThemeMode.dark
+                    ? 'Dark'
+                    : 'Follow System', onTap: () async {
+          _themeMode.value = next;
+          final box =
+              _themeToggleKey.currentContext?.findRenderObject() as RenderBox?;
+          await changeThemeWithFade(() => MyTheme.changeDarkMode(next),
+              origin: box?.localToGlobal(box.size.center(Offset.zero)));
+        }),
+      );
     });
   }
 
