@@ -4,16 +4,40 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-      - '[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+-[0-9]+'
-      - '[0-9]+.[0-9]+.[0-9]+-[0-9]+'
+      # TimeDesk releases, e.g. timedesk-2026.11.27. RustDesk's v1.2.3 tags would also start the F-Droid job.
+      - 'timedesk-*'
 
 jobs:
   run-flutter-tag-build:
+    # The repo's default token is read-only; the release jobs need write.
+    permissions:
+      contents: write
     uses: ./.github/workflows/flutter-build.yml
     secrets: inherit
     with:
       upload-artifact: true
       upload-tag: ${{ github.ref_name }}
       publish-update-metadata: ${{ github.repository == 'rustdesk/rustdesk' }}
+      # shortcut: Windows only for now; set false to build every platform again.
+      windows-only: true
+
+  # The build uploads into a pre-release; turn it into a normal release that lists the PRs merged since the last one.
+  publish-release-notes:
+    needs: run-flutter-tag-build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Write release notes
+        shell: bash
+        run: |
+          prev=$(gh api "repos/$REPO/releases?per_page=100" --jq '.[].tag_name' | grep '^timedesk-' | grep -vxF "$TAG" | head -n1 || true)
+          args=(-f tag_name="$TAG")
+          [ -n "$prev" ] && args+=(-f previous_tag_name="$prev")
+          gh api "repos/$REPO/releases/generate-notes" "${args[@]}" --jq .body > notes.md
+          gh release edit "$TAG" -R "$REPO" --prerelease=false --latest --title "TimeDesk ${TAG#timedesk-}" --notes-file notes.md
