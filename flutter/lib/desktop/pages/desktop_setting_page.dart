@@ -61,6 +61,9 @@ enum SettingsTabKey {
   about,
 }
 
+// TimeDesk: set by nightly builds (build.py --dart-define); empty otherwise.
+const _kDisplayVersion = String.fromEnvironment('TIMEDESK_DISPLAY_VERSION');
+
 class DesktopSettingPage extends StatefulWidget {
   final SettingsTabKey initialTabkey;
   static final List<SettingsTabKey> tabKeys = [
@@ -2444,7 +2447,9 @@ class _AboutState extends State<_About> {
   Widget build(BuildContext context) {
     return futureBuilder(future: () async {
       final license = await bind.mainGetLicense();
-      final version = await bind.mainGetVersion();
+      final version = _kDisplayVersion.isNotEmpty
+          ? _kDisplayVersion
+          : await bind.mainGetVersion();
       final buildDate = await bind.mainGetBuildDate();
       final fingerprint = await bind.mainGetFingerprint();
       final myId = await bind.mainGetMyId();

@@ -870,7 +870,11 @@ def build_flutter_windows(version, features, skip_portable_pack):
             print("cargo build failed, please check rust source code.")
             exit(-1)
     os.chdir('flutter')
-    system2('flutter build windows --release')
+    # TimeDesk: nightly builds pass a label (e.g. 1.5.3-nightly.20261127.2d0441c)
+    # that the About page shows; the app's own version stays numeric.
+    label = os.environ.get('TIMEDESK_DISPLAY_VERSION', '')
+    define = f' --dart-define=TIMEDESK_DISPLAY_VERSION={label}' if label else ''
+    system2('flutter build windows --release' + define)
     os.chdir('..')
     shutil.copy2('target/release/deps/dylib_virtual_display.dll',
                  flutter_build_dir_2)
