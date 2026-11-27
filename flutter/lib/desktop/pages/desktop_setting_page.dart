@@ -13,6 +13,7 @@ import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart';
 import 'package:flutter_hbb/common/widgets/keyboard_shortcuts/page_body.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_keyboard_shortcuts_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
+import 'package:flutter_hbb/desktop/widgets/theme_fade.dart';
 import 'package:flutter_hbb/desktop/widgets/remote_toolbar.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/printer_model.dart';
@@ -291,7 +292,10 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
           const VerticalDivider(width: 1),
           Expanded(
             child: Container(
-              color: Theme.of(context).scaffoldBackgroundColor,
+              // TimeDesk: gray page behind white cards, like the home page.
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).scaffoldBackgroundColor
+                  : MyTheme.grayBg,
               child: PageView(
                 controller: controller,
                 physics: NeverScrollableScrollPhysics(),
@@ -493,7 +497,8 @@ class _GeneralState extends State<_General> {
   Widget theme() {
     final current = MyTheme.getThemeModePreference().toShortString();
     onChanged(String value) async {
-      await MyTheme.changeDarkMode(MyTheme.themeModeFromString(value));
+      await changeThemeWithFade(
+          () => MyTheme.changeDarkMode(MyTheme.themeModeFromString(value)));
       setState(() {});
     }
 
@@ -2554,37 +2559,51 @@ Widget _Card(
       Flexible(
         child: SizedBox(
           width: _kCardFixedWidth,
-          child: Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-              side: BorderSide(
-                  color: MyTheme.currentThemeMode() == ThemeMode.dark
-                      ? MyTheme.macSeparatorDark
-                      : const Color(0xFFE3E3E8),
-                  width: 0.5),
-            ),
-            child: Column(
-              children: [
-                Row(
+          // TimeDesk: white card with the same soft shadow as the home page.
+          child: Builder(builder: (context) {
+            final dark = Theme.of(context).brightness == Brightness.dark;
+            return Container(
+              margin: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(dark ? 0.45 : 0.08),
+                    blurRadius: 18,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Card(
+                color: dark ? MyTheme.macGroupDark : Colors.white,
+                elevation: 0,
+                margin: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
                   children: [
-                    Expanded(
-                        child: Text(
-                      translate(title),
-                      textAlign: TextAlign.start,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    )),
-                    ...?title_suffix
+                    Row(
+                      children: [
+                        Expanded(
+                            child: Text(
+                          translate(title),
+                          textAlign: TextAlign.start,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        )),
+                        ...?title_suffix
+                      ],
+                    ).marginOnly(left: _kContentHMargin, top: 10, bottom: 10),
+                    ...children
+                        .map((e) => e.marginOnly(top: 4, right: _kContentHMargin)),
                   ],
-                ).marginOnly(left: _kContentHMargin, top: 10, bottom: 10),
-                ...children
-                    .map((e) => e.marginOnly(top: 4, right: _kContentHMargin)),
-              ],
-            ).marginOnly(bottom: 10),
-          ).marginOnly(left: _kCardLeftMargin, top: 15),
+                ).marginOnly(bottom: 10),
+              ),
+            );
+          }).marginOnly(left: _kCardLeftMargin, top: 15),
         ),
       ),
     ],

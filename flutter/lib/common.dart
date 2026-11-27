@@ -249,26 +249,26 @@ class MyTheme {
   MyTheme._();
 
   // macOS-style palette (system colors from Apple's HIG).
-  static const Color grayBg = Color(0xFFF5F5F7);
-  static const Color accent = Color(0xFF007AFF);
-  static const Color accentDark = Color(0xFF0A84FF);
-  static const Color accent50 = Color(0x77007AFF);
-  static const Color accent80 = Color(0xAA007AFF);
-  static const Color macSidebarLight = Color(0xFFEDEDF0);
-  static const Color macSidebarDark = Color(0xFF29292C);
-  static const Color macWindowDark = Color(0xFF1E1E1F);
-  static const Color macGroupDark = Color(0xFF2C2C2E);
-  static const Color macSeparatorLight = Color(0xFFD2D2D7);
-  static const Color macSeparatorDark = Color(0xFF3A3A3C);
-  static const Color macLabel = Color(0xFF1D1D1F);
-  static const Color macSecondaryLabel = Color(0xFF86868B);
+  static const Color grayBg = Color(0xFFF5F6F7);
+  static const Color accent = Color(0xFFC12126);
+  static const Color accentDark = Color(0xFFC12126);
+  static const Color accent50 = Color(0x77C12126);
+  static const Color accent80 = Color(0xAAC12126);
+  static const Color macSidebarLight = Color(0xFFE9EBED);
+  static const Color macSidebarDark = Color(0xFF16181B);
+  static const Color macWindowDark = Color(0xFF16181B);
+  static const Color macGroupDark = Color(0xFF212529);
+  static const Color macSeparatorLight = Color(0xFFD5D8DC);
+  static const Color macSeparatorDark = Color(0xFF3A4048);
+  static const Color macLabel = Color(0xFF212529);
+  static const Color macSecondaryLabel = Color(0xFF5A6068);
   static const Color canvasColor = Color(0xFF212121);
   static const Color border = Color(0xFFCCCCCC);
   static const Color idColor = Color(0xFF00B6F0);
   static const Color darkGray = Color.fromARGB(255, 148, 148, 148);
   static const Color cmIdColor = Color(0xFF21790B);
   static const Color dark = Colors.black87;
-  static const Color button = Color(0xFF007AFF);
+  static const Color button = Color(0xFFC12126);
   static const Color hoverBorder = Color(0xFF999999);
 
   // ListTile

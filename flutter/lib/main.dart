@@ -7,6 +7,7 @@ import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common/widgets/overlay.dart';
+import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
 import 'package:flutter_hbb/desktop/pages/host_password_page.dart';
 import 'package:flutter_hbb/desktop/pages/install_page.dart';
@@ -16,6 +17,7 @@ import 'package:flutter_hbb/desktop/screen/desktop_view_camera_screen.dart';
 import 'package:flutter_hbb/desktop/screen/desktop_port_forward_screen.dart';
 import 'package:flutter_hbb/desktop/screen/desktop_remote_screen.dart';
 import 'package:flutter_hbb/desktop/screen/desktop_terminal_screen.dart';
+import 'package:flutter_hbb/desktop/widgets/theme_fade.dart';
 import 'package:flutter_hbb/desktop/widgets/refresh_wrapper.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
@@ -157,7 +159,8 @@ void runMainApp(bool startService) async {
       isMainWindow: true, alwaysOnTop: alwaysOnTop);
   windowManager.waitUntilReadyToShow(windowOptions, () async {
     // Restore the location of the main window before window hide or show.
-    await restoreWindowPosition(WindowType.Main);
+    final restored = await restoreWindowPosition(WindowType.Main);
+    if (!bind.isIncomingOnly()) await fitTimedeskMainWindow(restored);
     // Check the startup argument, if we successfully handle the argument, we keep the main window hidden.
     final handledByUniLinks = await initUniLinks();
     debugPrint("handled by uni links: $handledByUniLinks");
@@ -547,6 +550,10 @@ class _AppState extends State<App> with WidgetsBindingObserver {
               : (context, child) {
                   child = _keepScaleBuilder(context, child);
                   child = botToastBuilder(context, child);
+                  if (isDesktop && desktopType == DesktopType.main) {
+                    child = _noThemeFadeBuilder(context, child);
+                    child = ThemeFade(key: themeFadeKey, child: child);
+                  }
                   if ((isDesktop && desktopType == DesktopType.main) ||
                       isWebDesktop) {
                     child = keyListenerBuilder(context, child);
@@ -611,4 +618,16 @@ Widget keyListenerBuilder(BuildContext context, Widget? child) {
       }
     },
   );
+}
+
+// TimeDesk: apply a theme change at once. MaterialApp cross-fades themes over
+// 200 ms, which showed half-faded text while switching.
+Widget _noThemeFadeBuilder(BuildContext context, Widget? child) {
+  final mode = Get.rootController.themeMode ?? MyTheme.getThemeModePreference();
+  final dark = mode == ThemeMode.dark ||
+      (mode == ThemeMode.system &&
+          MediaQuery.platformBrightnessOf(context) == Brightness.dark);
+  return Theme(
+      data: dark ? MyTheme.darkTheme : MyTheme.lightTheme,
+      child: child ?? Container());
 }

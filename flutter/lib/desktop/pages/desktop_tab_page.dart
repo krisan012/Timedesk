@@ -96,15 +96,9 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
             backgroundColor: Theme.of(context).colorScheme.background,
             body: DesktopTab(
               controller: tabController,
-              tail: Offstage(
-                offstage: bind.isIncomingOnly() || bind.isDisableSettings(),
-                child: ActionIcon(
-                  message: 'Settings',
-                  icon: IconFont.menu,
-                  onTap: DesktopTabPage.onAddSetting,
-                  isClose: false,
-                ),
-              ),
+              // Settings lives in the home page's nav rail; the window has a
+              // maximum size, so it has no maximize either.
+              showMaximize: false,
             )));
     return isMacOS || kUseCompatibleUiMode
         ? tabWidget
