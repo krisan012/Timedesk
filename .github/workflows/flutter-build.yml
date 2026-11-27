@@ -340,6 +340,11 @@ jobs:
       - name: Build rustdesk
         run: |
           # Windows: build RustDesk
+          # TimeDesk: label nightly builds for the About page, e.g. 1.5.3-nightly.20261127.2d0441c.
+          if ("${{ inputs.upload-tag }}" -eq "nightly") {
+            $env:TIMEDESK_DISPLAY_VERSION = "$env:VERSION-nightly.$((Get-Date).ToUniversalTime().ToString('yyyyMMdd')).$('${{ github.sha }}'.Substring(0, 7))"
+            Write-Host "Display version: $env:TIMEDESK_DISPLAY_VERSION"
+          }
           # --hwcodec is shared by all Windows targets; per-target extras (e.g. --vram) come from the matrix
           python3 .\build.py --portable --flutter --skip-portable-pack --hwcodec ${{ matrix.job.build-args }}
           mv ./flutter/build/windows/${{ matrix.job.flutter-arch }}/runner/Release ./rustdesk
