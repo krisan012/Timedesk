@@ -143,7 +143,7 @@ jobs:
       matrix:
         job:
           - {
-              target: windows-2022,
+              target: "${{ vars.TIMEDESK_WINDOWS_RUNNER || 'windows-2022' }}",
               platform: x64,
             }
           # shortcut: TimeDesk builds x64 only for now (ARM costs minutes on a private repo); uncomment to build ARM again.
@@ -161,7 +161,8 @@ jobs:
   build-for-windows-flutter:
     name: ${{ matrix.job.target }}
     needs: [build-RustDeskTempTopMostWindow, generate-bridge]
-    runs-on: ${{ matrix.job.os }}
+    # TimeDesk: repo variable TIMEDESK_WINDOWS_RUNNER (e.g. a self-hosted runner label) overrides GitHub's runner.
+    runs-on: ${{ vars.TIMEDESK_WINDOWS_RUNNER || matrix.job.os }}
     strategy:
       fail-fast: false
       matrix:
