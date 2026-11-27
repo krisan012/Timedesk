@@ -1,14 +1,8 @@
 name: Flutter Nightly Build
 
 on:
-  # TimeDesk: build on every merge into master instead of every night.
-  push:
-    branches:
-      - master
-    paths-ignore:
-      - ".github/**"
-      - "docs/**"
-      - "README.md"
+  # TimeDesk: manual only. Run it from the Actions tab on `dev` when an
+  # installer is wanted; releases come from timedesk-* tags on master.
   workflow_dispatch:
 
 # Merges close together all upload to the same "nightly" release; only the newest build is kept.
